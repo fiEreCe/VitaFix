@@ -35,9 +35,11 @@ app.get('/api/health', (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   const frontendPath = path.join(__dirname, '../web/dist');
   app.use(express.static(frontendPath));
-  // SPA fallback：非 API 路由都返回 index.html
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'));
+  // SPA fallback：非 API 路由都返回 index.html（不用 app.get('*')，Express 5 已弃用通配符）
+  app.use((req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    }
   });
 }
 
