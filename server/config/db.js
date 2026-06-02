@@ -1,19 +1,30 @@
 const mongoose = require('mongoose');
-const dns = require('dns');
 const config = require('./index');
 
-// 解决 Windows 上 Node.js DNS 解析器(c-ares)无法解析 SRV 记录的问题
-// 使用系统 DNS 或公网 DNS(8.8.8.8) 替代
-dns.setServers(['8.8.8.8', '1.1.1.1', '223.5.5.5']);
+// 仅在 Windows 上覆写 DNS（解决 c-ares 无法解析 SRV 记录的问题）
+if (process.platform === 'win32') {
+  const dns = require('dns');
+  dns.setServers(['8.8.8.8', '1.1.1.1', '223.5.5.5']);
+}
 
-const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(config.mongodbUri);
-    console.log(`MongoDB connected: ${conn.connection.host}`);
-  } catch (error) {
-    console.error(`MongoDB connection error: ${error.message}`);
-    process.exit(1);
+const connectDB = async (retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const conn = await mongoose.connect(config.mongodbUri, {
+        serverSelectionTimeoutMS: 5000,
+      });
+      console.log(`MongoDB connected: ${conn.connection.host}`);
+      return;
+    } catch (error) {
+      console.error(`MongoDB connection error (attempt ${i + 1}/${retries}): ${error.message}`);
+      if (i < retries - 1) {
+        console.log('Retrying in 3 seconds...');
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    }
   }
+  console.error('All MongoDB connection attempts failed. Exiting.');
+  process.exit(1);
 };
 
 module.exports = connectDB;
