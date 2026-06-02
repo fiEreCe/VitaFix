@@ -64,5 +64,9 @@ body {
   --van-loading-text-font-size: 14px;
   --van-dialog-header-font-weight: 600;
   --van-action-sheet-header-font-weight: 600;
+
+  /* Toast 修复：深色背景 + 白色文字 */
+  --van-toast-background: rgba(0, 0, 0, 0.8);
+  --van-toast-text-color: #ffffff;
 }
 </style>
