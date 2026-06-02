@@ -1,0 +1,10 @@
+{
+  "name": "jingzhu-zhushou",
+  "version": "1.0.0",
+  "description": "精投助手 - 简历JD匹配分析工具",
+  "scripts": {
+    "install": "cd web && npm install && cd ../server && npm install",
+    "build": "cd web && npm run build",
+    "start": "cd server && NODE_ENV=production node app.js"
+  }
+}
