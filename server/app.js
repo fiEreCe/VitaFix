@@ -31,6 +31,16 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// 生产环境下托管前端静态文件
+if (process.env.NODE_ENV === 'production') {
+  const frontendPath = path.join(__dirname, '../web/dist');
+  app.use(express.static(frontendPath));
+  // SPA fallback：非 API 路由都返回 index.html
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+}
+
 // 全局错误处理
 app.use((err, req, res, next) => {
   console.error('未捕获错误:', err);
