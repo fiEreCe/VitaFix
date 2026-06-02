@@ -1,0 +1,24 @@
+{
+  "name": "jingzhu-web",
+  "version": "1.0.0",
+  "description": "精投助手前端",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vant/auto-import-resolver": "^1.3.0",
+    "unplugin-auto-import": "^21.0.0",
+    "unplugin-vue-components": "^32.1.0",
+    "vant": "^4.9.24",
+    "vue": "^3.5.35",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.7",
+    "sass": "^1.100.0",
+    "vite": "^8.0.16"
+  }
+}
