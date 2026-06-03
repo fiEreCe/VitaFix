@@ -7,6 +7,7 @@ module.exports = {
   deepseek: {
     apiKey: process.env.DEEPSEEK_API_KEY || '',
     apiUrl: process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1',
+    model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
   },
   uploadDir: process.env.UPLOAD_DIR || 'uploads',
 };

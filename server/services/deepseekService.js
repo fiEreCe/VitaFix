@@ -16,16 +16,56 @@ class DeepSeekService {
     });
   }
 
+  /** 并发控制：同时最多 2 个请求 */
+  static maxConcurrent = 2;
+  static activeRequests = 0;
+  static requestQueue = [];
+
   /**
-   * 调用 DeepSeek 聊天补全 API
+   * 等待直到并发槽位可用
+   */
+  async _acquireSlot() {
+    if (DeepSeekService.activeRequests < DeepSeekService.maxConcurrent) {
+      DeepSeekService.activeRequests++;
+      return;
+    }
+    return new Promise((resolve) => {
+      DeepSeekService.requestQueue.push(resolve);
+    });
+  }
+
+  _releaseSlot() {
+    if (DeepSeekService.requestQueue.length > 0) {
+      const next = DeepSeekService.requestQueue.shift();
+      next();
+    } else {
+      DeepSeekService.activeRequests--;
+    }
+  }
+
+  /**
+   * 判断错误是否可重试
+   */
+  _isRetryable(error) {
+    if (!error.response) return true; // 网络超时/断连
+    const status = error.response.status;
+    return status >= 500 || status === 429; // 服务端错误或限流
+  }
+
+  /**
+   * 调用 DeepSeek 聊天补全 API（带重试 + 并发控制）
    * @param {string} prompt - 提示词
    * @param {Object} options - 可选参数
+   * @param {number} retries - 重试次数
    * @returns {Promise<string>} - 返回文本内容
    */
-  async chat(prompt, options = {}) {
+  async chat(prompt, options = {}, retries = 2) {
+    // 等待并发槽位
+    await this._acquireSlot();
+
     const {
-      model = 'deepseek-chat',
-      temperature = 0.1,  // 低温度确保结构化输出
+      model = config.deepseek.model,
+      temperature = 0.1,
       maxTokens = 4096,
     } = options;
 
@@ -42,6 +82,13 @@ class DeepSeekService {
       const content = response.data.choices[0].message.content.trim();
       return content;
     } catch (error) {
+      if (retries > 0 && this._isRetryable(error)) {
+        const delay = 1000 * (3 - retries + 1); // 1s, 2s
+        console.log(`DeepSeek API 失败，${delay}ms 后重试（剩余 ${retries - 1} 次）`);
+        await new Promise((r) => setTimeout(r, delay));
+        return this.chat(prompt, options, retries - 1);
+      }
+
       if (error.response) {
         console.error('DeepSeek API error:', {
           status: error.response.status,
@@ -50,6 +97,8 @@ class DeepSeekService {
         throw new Error(`DeepSeek API 请求失败: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
       }
       throw new Error(`DeepSeek API 请求失败: ${error.message}`);
+    } finally {
+      this._releaseSlot();
     }
   }
 

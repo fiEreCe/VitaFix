@@ -127,6 +127,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { analysisApi } from '../api'
 import { getGradeColor } from '../utils/format'
+import { events } from '../utils/analytics'
 import ScoreCircle from '../components/ScoreCircle.vue'
 import RadarChart from '../components/RadarChart.vue'
 import DimensionCard from '../components/DimensionCard.vue'
@@ -207,6 +208,7 @@ async function loadResult(id) {
     result.value = res.analysis
     analysisName.value = res.name || '分析结果'
     loading.value = false
+    events.analysisCompleted()
   } catch (e) {
     failed.value = true
     errorMessage.value = e.message

@@ -254,6 +254,8 @@ async function submitResume() {
 }
 
 function goSupplement() {
+  // 持久化到 localStorage，防止刷新丢失
+  savePendingState()
   router.push({
     path: '/supplement',
     query: { resumeId: currentResumeId.value, jdId: jdId.value },
@@ -261,10 +263,16 @@ function goSupplement() {
 }
 
 function startAnalysis() {
+  savePendingState()
   router.push({
     path: '/supplement',
     query: { resumeId: currentResumeId.value, jdId: jdId.value, skip: '1' },
   })
+}
+
+function savePendingState() {
+  localStorage.setItem('pendingResumeId', currentResumeId.value)
+  localStorage.setItem('pendingJdId', jdId.value)
 }
 
 function formatFileSize(bytes) {

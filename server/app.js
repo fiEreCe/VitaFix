@@ -10,6 +10,7 @@ const supplementRoutes = require('./routes/supplement');
 const analysisRoutes = require('./routes/analysis');
 const historyRoutes = require('./routes/history');
 const userIdMiddleware = require('./middleware/userId');
+const cleanupOldData = require('./services/cleanup');
 
 const app = express();
 
@@ -55,6 +56,10 @@ const startServer = async () => {
   app.listen(config.port, () => {
     console.log(`精投助手服务端启动成功，端口: ${config.port}`);
   });
+
+  // 启动时清理过期数据，之后每天清理一次
+  cleanupOldData();
+  setInterval(cleanupOldData, 24 * 60 * 60 * 1000);
 };
 
 startServer();

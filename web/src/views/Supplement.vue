@@ -101,12 +101,14 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { supplementApi, analysisApi } from '../api'
+import { events } from '../utils/analytics'
 
 const route = useRoute()
 const router = useRouter()
 
-const resumeId = computed(() => route.query.resumeId || '')
-const jdId = computed(() => route.query.jdId || '')
+// 先从 query 取，刷新丢失时从 localStorage 恢复
+const resumeId = computed(() => route.query.resumeId || localStorage.getItem('pendingResumeId') || '')
+const jdId = computed(() => route.query.jdId || localStorage.getItem('pendingJdId') || '')
 const skipSupplement = computed(() => route.query.skip === '1')
 
 const items = ref([])
@@ -171,6 +173,10 @@ async function saveAndAnalyze() {
 async function startAnalysis() {
   try {
     const res = await analysisApi.create(jdId.value, resumeId.value)
+    events.analysisStarted()
+    // 清理 localStorage 中的暂存数据
+    localStorage.removeItem('pendingResumeId')
+    localStorage.removeItem('pendingJdId')
     showToast('分析已启动')
     router.replace(`/result/${res.id}`)
   } catch (e) {

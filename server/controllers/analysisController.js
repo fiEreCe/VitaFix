@@ -43,6 +43,7 @@ exports.create = async (req, res) => {
 
     // 异步执行AI分析
     setImmediate(async () => {
+      const startTime = Date.now();
       try {
         const result = await matchAnalyzer.analyze(
           jd.parsed,
@@ -53,12 +54,13 @@ exports.create = async (req, res) => {
         analysis.analysis = result;
         analysis.status = 'completed';
         await analysis.save();
-        console.log(`分析完成: ${analysis._id}`);
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        console.log(`[分析] 完成 ${analysis._id}，耗时 ${elapsed}s，分数 ${result.overallScore}`);
       } catch (error) {
         analysis.status = 'failed';
         analysis.errorMessage = error.message;
         await analysis.save();
-        console.error(`分析失败: ${analysis._id}`, error.message);
+        console.error(`[分析] 失败 ${analysis._id}: ${error.message}`);
       }
     });
 

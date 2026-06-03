@@ -53,6 +53,15 @@
         </div>
       </div>
     </div>
+
+    <!-- 隐私提示 -->
+    <div class="privacy-notice">
+      <p>
+        🔒 你的简历和 JD 数据仅用于本次 AI 分析，7 天后自动删除。
+        作为 Demo 项目，开发者可能在调试时看到数据，不会用于其他用途。
+        如有疑虑，可在历史记录中手动删除。
+      </p>
+    </div>
   </div>
 </template>
 
@@ -243,5 +252,21 @@ function startNewAnalysis() {
 .score-grade {
   font-size: 12px;
   margin-top: 2px;
+}
+
+/* Privacy */
+.privacy-notice {
+  margin: 32px 20px 16px;
+  padding: 12px 14px;
+  background: #f5f5f7;
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  color: #86868b;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.privacy-notice p {
+  margin: 0;
 }
 </style>

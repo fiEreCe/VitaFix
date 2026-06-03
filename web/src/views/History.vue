@@ -69,6 +69,7 @@ import { ref, onMounted } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { historyApi } from '../api'
 import { formatDate, getGradeColor } from '../utils/format'
+import { events } from '../utils/analytics'
 
 const list = ref([])
 const loading = ref(true)
@@ -115,6 +116,7 @@ async function saveName() {
   try {
     await historyApi.updateName(editingItem.value.id, editName.value.trim())
     editingItem.value.name = editName.value.trim()
+    events.historyRenamed()
     showToast('已更新')
   } catch (e) {
     showToast('更新失败: ' + e.message)
@@ -129,6 +131,7 @@ function confirmDelete(item) {
     try {
       await historyApi.remove(item.id)
       list.value = list.value.filter((i) => i.id !== item.id)
+      events.historyDeleted()
       showToast('已删除')
     } catch (e) {
       showToast('删除失败: ' + e.message)
