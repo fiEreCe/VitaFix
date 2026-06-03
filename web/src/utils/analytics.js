@@ -1,7 +1,8 @@
 /**
  * 轻量埋点工具
  *
- * 记录用户关键行为，输出到控制台（Railway 日志中可见）。
+ * 记录用户关键行为，输出到控制台（Railway 日志中可见），
+ * 同时发送到服务端的 /api/track 接口统一收集。
  * MVP 阶段无需第三方 SDK，后续可平滑接入 Amplitude / Mixpanel。
  */
 
@@ -30,6 +31,13 @@ export function track(event, data = {}) {
     ...data,
   }
   console.log('[埋点]', JSON.stringify(payload))
+
+  // 发送到服务端统一收集（发后即忘，不 await）
+  fetch('/api/track', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).catch(() => {})
 }
 
 /**

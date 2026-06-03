@@ -32,6 +32,14 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// 埋点收集（只记录日志，不存库）
+app.post('/api/track', (req, res) => {
+  const { event, page, ...data } = req.body || {};
+  const visitorId = req.headers['x-user-id'] || 'anonymous';
+  console.log(`[埋点] ${event} | visitor=${visitorId} | page=${page} | ${JSON.stringify(data)}`);
+  res.json({ ok: true });
+});
+
 // 生产环境下托管前端静态文件
 if (process.env.NODE_ENV === 'production') {
   const frontendPath = path.join(__dirname, '../web/dist');
