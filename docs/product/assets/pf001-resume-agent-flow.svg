@@ -1,0 +1,247 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2000" viewBox="0 0 1600 2000" role="img" aria-labelledby="title desc">
+  <title id="title">PF-001 证据驱动的简历优化 Agent 纵向主流程图</title>
+  <desc id="desc">以从上到下的纵向主干展示简历优化 Agent 核心流程，动态追问、事实修正、风险提醒和停止条件位于左右旁支。</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#0F172A" flood-opacity="0.08"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#64748B"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#2563EB"/>
+    </marker>
+    <style>
+      .bg { fill:#F6F8FC; }
+      .lane { fill:#F8FBFF; stroke:#DBEAFE; stroke-width:2; }
+      .side { fill:#FFFFFF; stroke:#E2E8F0; stroke-width:1.5; }
+      .node { fill:#FFFFFF; stroke:#CBD5E1; stroke-width:2; }
+      .blue { fill:#EFF6FF; stroke:#60A5FA; stroke-width:2.2; }
+      .purple { fill:#F5F3FF; stroke:#A78BFA; stroke-width:2.2; }
+      .green { fill:#ECFDF5; stroke:#34D399; stroke-width:2.2; }
+      .orange { fill:#FFF7ED; stroke:#FB923C; stroke-width:2; }
+      .gray { fill:#F8FAFC; stroke:#94A3B8; stroke-width:2; }
+      .risk { fill:#FFF1F2; stroke:#FB7185; stroke-width:2; }
+      .decision { fill:#FFFBEB; stroke:#F59E0B; stroke-width:2.5; }
+      .mainline { fill:none; stroke:#2563EB; stroke-width:4; marker-end:url(#arrowBlue); }
+      .branch { fill:none; stroke:#64748B; stroke-width:2.5; marker-end:url(#arrow); }
+      .return { fill:none; stroke:#2563EB; stroke-width:2.5; stroke-dasharray:9 7; marker-end:url(#arrowBlue); }
+      .title { font:700 34px 'Inter','PingFang SC','Microsoft YaHei',sans-serif; fill:#0F172A; }
+      .subtitle { font:400 17px 'Inter','PingFang SC','Microsoft YaHei',sans-serif; fill:#64748B; }
+      .lane-title { font:700 16px 'Inter','PingFang SC','Microsoft YaHei',sans-serif; fill:#2563EB; letter-spacing:1px; }
+      .side-title { font:700 16px 'Inter','PingFang SC','Microsoft YaHei',sans-serif; fill:#475569; }
+      .label { font:600 17px 'Inter','PingFang SC','Microsoft YaHei',sans-serif; fill:#0F172A; text-anchor:middle; }
+      .small { font:400 14px 'Inter','PingFang SC','Microsoft YaHei',sans-serif; fill:#475569; text-anchor:middle; }
+      .tiny { font:500 13px 'Inter','PingFang SC','Microsoft YaHei',sans-serif; fill:#475569; text-anchor:middle; }
+      .edge { font:600 13px 'Inter','PingFang SC','Microsoft YaHei',sans-serif; fill:#475569; }
+      .step-num { font:700 14px 'Inter','PingFang SC','Microsoft YaHei',sans-serif; fill:#FFFFFF; text-anchor:middle; }
+      .note { font:400 14px 'Inter','PingFang SC','Microsoft YaHei',sans-serif; fill:#475569; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="2000"/>
+  <text x="60" y="65" class="title">证据驱动的简历优化 Agent</text>
+  <text x="60" y="98" class="subtitle">纵向主干表示用户完成核心任务的必经路径；左右旁支用于补充信息、处理风险和异常结束。</text>
+
+  <!-- Lanes -->
+  <rect x="545" y="135" width="510" height="1770" rx="28" class="lane"/>
+  <text x="580" y="171" class="lane-title">主功能路径 · 从上到下</text>
+
+  <rect x="45" y="620" width="440" height="940" rx="24" class="side"/>
+  <text x="75" y="658" class="side-title">左侧旁支 · 信息补充与用户编辑</text>
+
+  <rect x="1115" y="620" width="440" height="940" rx="24" class="side"/>
+  <text x="1145" y="658" class="side-title">右侧旁支 · 审核修正与停止条件</text>
+
+  <!-- Main spine nodes -->
+  <g filter="url(#shadow)">
+    <circle cx="585" cy="245" r="19" fill="#2563EB"/>
+    <text x="585" y="250" class="step-num">1</text>
+    <rect x="620" y="195" width="360" height="100" rx="18" class="blue"/>
+    <text x="800" y="235" class="label">输入并确认 JD 与简历</text>
+    <text x="800" y="264" class="small">创建临时分析会话，冻结输入快照</text>
+
+    <circle cx="585" cy="390" r="19" fill="#2563EB"/>
+    <text x="585" y="395" class="step-num">2</text>
+    <rect x="620" y="340" width="360" height="100" rx="18" class="node"/>
+    <text x="800" y="380" class="label">解析岗位要求与简历事实</text>
+    <text x="800" y="409" class="small">结构化要求、经历、行动和结果</text>
+
+    <circle cx="585" cy="535" r="19" fill="#2563EB"/>
+    <text x="585" y="540" class="step-num">3</text>
+    <rect x="620" y="485" width="360" height="100" rx="18" class="node"/>
+    <text x="800" y="525" class="label">建立要求—证据匹配</text>
+    <text x="800" y="554" class="small">生成任务并推荐最高优先级项</text>
+
+    <circle cx="585" cy="700" r="19" fill="#2563EB"/>
+    <text x="585" y="705" class="step-num">4</text>
+    <path d="M800 625 L915 700 L800 775 L685 700 Z" class="decision"/>
+    <text x="800" y="692" class="label">信息充分度？</text>
+    <text x="800" y="720" class="small">strong / basic / insufficient</text>
+
+    <circle cx="585" cy="875" r="19" fill="#2563EB"/>
+    <text x="585" y="880" class="step-num">5</text>
+    <rect x="620" y="825" width="360" height="100" rx="18" class="purple"/>
+    <text x="800" y="865" class="label">生成一个主候选</text>
+    <text x="800" y="894" class="small">只使用已确认事实；basic 仅保守表达</text>
+
+    <circle cx="585" cy="1040" r="19" fill="#2563EB"/>
+    <text x="585" y="1045" class="step-num">6</text>
+    <path d="M800 965 L915 1040 L800 1115 L685 1040 Z" class="decision"/>
+    <text x="800" y="1032" class="label">AI 事实审核</text>
+    <text x="800" y="1060" class="small">依据、数字、归因与项目性质</text>
+
+    <circle cx="585" cy="1215" r="19" fill="#2563EB"/>
+    <text x="585" y="1220" class="step-num">7</text>
+    <rect x="620" y="1165" width="360" height="100" rx="18" class="green"/>
+    <text x="800" y="1205" class="label">展示可追溯建议</text>
+    <text x="800" y="1234" class="small">JD 依据 · 真实事实 · 候选 · 修改理由</text>
+
+    <circle cx="585" cy="1380" r="19" fill="#2563EB"/>
+    <text x="585" y="1385" class="step-num">8</text>
+    <path d="M800 1305 L915 1380 L800 1455 L685 1380 Z" class="decision"/>
+    <text x="800" y="1372" class="label">用户决定</text>
+    <text x="800" y="1400" class="small">采用 / 编辑 / 拒绝 / 修正事实</text>
+
+    <circle cx="585" cy="1555" r="19" fill="#2563EB"/>
+    <text x="585" y="1560" class="step-num">9</text>
+    <rect x="620" y="1505" width="360" height="100" rx="18" class="green"/>
+    <text x="800" y="1545" class="label">保存最终文本与状态</text>
+    <text x="800" y="1574" class="small">记录来源、审核状态和风险确认</text>
+
+    <circle cx="585" cy="1720" r="19" fill="#2563EB"/>
+    <text x="585" y="1725" class="step-num">10</text>
+    <rect x="620" y="1670" width="360" height="100" rx="18" class="blue"/>
+    <text x="800" y="1710" class="label">进入 PF-003 修改—重评</text>
+    <text x="800" y="1739" class="small">展示修改效果、原因和剩余问题</text>
+  </g>
+
+  <!-- Main spine arrows -->
+  <path d="M800 295 V340" class="mainline"/>
+  <path d="M800 440 V485" class="mainline"/>
+  <path d="M800 585 V625" class="mainline"/>
+  <path d="M800 775 V825" class="mainline"/>
+  <text x="818" y="804" class="edge">strong / basic</text>
+  <path d="M800 925 V965" class="mainline"/>
+  <path d="M800 1115 V1165" class="mainline"/>
+  <text x="818" y="1144" class="edge">通过</text>
+  <path d="M800 1265 V1305" class="mainline"/>
+  <path d="M800 1455 V1505" class="mainline"/>
+  <text x="818" y="1485" class="edge">采用</text>
+  <path d="M800 1605 V1670" class="mainline"/>
+
+  <!-- Left branch: questioning -->
+  <g filter="url(#shadow)">
+    <path d="M260 690 L345 750 L260 810 L175 750 Z" class="decision"/>
+    <text x="260" y="744" class="label">有效追问</text>
+    <text x="260" y="770" class="small">少于 3 轮？</text>
+
+    <rect x="105" y="855" width="310" height="88" rx="16" class="orange"/>
+    <text x="260" y="890" class="label">提出一个关键问题</text>
+    <text x="260" y="917" class="small">行动 → 对象 → 贡献 → 方法 → 结果</text>
+
+    <path d="M260 980 L350 1040 L260 1100 L170 1040 Z" class="decision"/>
+    <text x="260" y="1034" class="label">回答质量？</text>
+    <text x="260" y="1060" class="small">相关 / 偏题 / 冲突 / 未知</text>
+
+    <rect x="105" y="1145" width="310" height="88" rx="16" class="blue"/>
+    <text x="260" y="1180" class="label">提取并确认事实摘要</text>
+    <text x="260" y="1207" class="small">只有确认事实可进入候选生成</text>
+
+    <rect x="105" y="1280" width="310" height="100" rx="16" class="gray"/>
+    <text x="260" y="1315" class="label">停止自动追问</text>
+    <text x="260" y="1342" class="small">继续补充 / 保守表达</text>
+    <text x="260" y="1365" class="small">自主编辑 / 暂时跳过</text>
+
+    <rect x="105" y="1430" width="310" height="90" rx="16" class="purple"/>
+    <text x="260" y="1466" class="label">用户自主编辑</text>
+    <text x="260" y="1493" class="small">不限制用户最终内容</text>
+  </g>
+
+  <path d="M685 700 H345" class="branch"/>
+  <text x="460" y="682" class="edge">insufficient · 信息不足</text>
+  <path d="M260 810 V855" class="branch"/>
+  <text x="278" y="835" class="edge">是</text>
+  <path d="M260 943 V980" class="branch"/>
+  <path d="M260 1100 V1145" class="branch"/>
+  <text x="278" y="1127" class="edge">相关 / 部分相关</text>
+  <path d="M415 1189 H510 V700 H685" class="return"/>
+  <text x="425" y="1171" class="edge">确认后重新判断</text>
+  <path d="M175 750 H85 V1330 H105" class="branch"/>
+  <text x="91" y="802" class="edge">已满三轮</text>
+  <path d="M170 1040 H75 V1330 H105" class="branch"/>
+  <text x="82" y="1020" class="edge">再次偏题</text>
+  <path d="M260 1380 V1430" class="branch"/>
+  <text x="277" y="1410" class="edge">自己编辑</text>
+
+  <!-- Left supplemental notes -->
+  <rect x="70" y="1585" width="380" height="235" rx="18" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="95" y="1620" class="side-title">回答异常的补充规则</text>
+  <circle cx="99" cy="1660" r="5" fill="#F59E0B"/>
+  <text x="115" y="1666" class="note">答非所问：澄清一次，不直接消耗轮次</text>
+  <circle cx="99" cy="1700" r="5" fill="#F59E0B"/>
+  <text x="115" y="1706" class="note">事实冲突：展示新旧内容，由用户选择</text>
+  <circle cx="99" cy="1740" r="5" fill="#F59E0B"/>
+  <text x="115" y="1746" class="note">不记得：记录未知，不推断事实</text>
+  <circle cx="99" cy="1780" r="5" fill="#F59E0B"/>
+  <text x="115" y="1786" class="note">明确没做过：用户确认后标记能力缺口</text>
+
+  <!-- Right branch: verification and stopping -->
+  <g filter="url(#shadow)">
+    <rect x="1180" y="820" width="310" height="88" rx="16" class="risk"/>
+    <text x="1335" y="855" class="label">无法可靠生成</text>
+    <text x="1335" y="882" class="small">信息不足且用户选择跳过</text>
+
+    <rect x="1180" y="985" width="310" height="90" rx="16" class="orange"/>
+    <text x="1335" y="1021" class="label">自动修正一次</text>
+    <text x="1335" y="1048" class="small">再次执行独立事实审核</text>
+
+    <rect x="1180" y="1125" width="310" height="100" rx="16" class="risk"/>
+    <text x="1335" y="1160" class="label">停止自动生成</text>
+    <text x="1335" y="1187" class="small">无依据或第二次审核仍失败</text>
+
+    <rect x="1180" y="1335" width="310" height="90" rx="16" class="gray"/>
+    <text x="1335" y="1371" class="label">拒绝并保留原文</text>
+    <text x="1335" y="1398" class="small">记录用户决定，结束当前任务</text>
+
+    <path d="M1335 1465 L1430 1530 L1335 1595 L1240 1530 Z" class="decision"/>
+    <text x="1335" y="1524" class="label">用户编辑</text>
+    <text x="1335" y="1550" class="small">发现风险？</text>
+
+    <rect x="1180" y="1650" width="310" height="100" rx="16" class="risk"/>
+    <text x="1335" y="1685" class="label">具体风险提醒</text>
+    <text x="1335" y="1712" class="small">返回修改或确认仍然继续</text>
+    <text x="1335" y="1735" class="small">提醒不阻断保存和重评</text>
+  </g>
+
+  <path d="M415 1330 H1090 V864 H1180" class="branch"/>
+  <text x="932" y="846" class="edge">跳过且不足 basic</text>
+
+  <path d="M915 1040 H1180" class="branch"/>
+  <text x="1005" y="1020" class="edge">可修正</text>
+  <path d="M1180 1030 H1100 V960 H800 V965" class="return"/>
+  <path d="M915 1065 H1090 V1175 H1180" class="branch"/>
+  <text x="1003" y="1100" class="edge">无依据 / 再次失败</text>
+
+  <path d="M915 1380 H1180" class="branch"/>
+  <text x="1024" y="1361" class="edge">拒绝</text>
+  <path d="M800 1455 V1475 H1110 V1530 H1240" class="branch"/>
+  <text x="1010" y="1458" class="edge">编辑后采用</text>
+  <path d="M1335 1595 V1650" class="branch"/>
+  <text x="1353" y="1623" class="edge">有风险</text>
+  <path d="M1240 1530 H1130 V1555 H980" class="return"/>
+  <text x="1048" y="1538" class="edge">无风险</text>
+  <path d="M1180 1700 H1100 V1580 H980" class="return"/>
+  <text x="1032" y="1682" class="edge">已了解，仍然继续</text>
+
+  <!-- Extra return from user correcting facts -->
+  <path d="M685 1380 H540 V880 H415" class="return"/>
+  <text x="438" y="1362" class="edge">修正事实 → 返回追问</text>
+
+  <!-- Footer -->
+  <rect x="545" y="1830" width="510" height="75" rx="18" fill="#EFF6FF" stroke="#BFDBFE"/>
+  <text x="800" y="1861" class="label">核心责任边界</text>
+  <text x="800" y="1887" class="small">AI 对生成内容严格负责；用户对自己的简历拥有最终决定权</text>
+
+  <text x="60" y="1960" class="subtitle">主干只有一条：输入 → 解析 → 匹配 → 生成 → 审核 → 用户决定 → 保存 → 重评。</text>
+</svg>
