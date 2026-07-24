@@ -112,7 +112,7 @@
     <circle cx="585" cy="1720" r="19" fill="#2563EB"/>
     <text x="585" y="1725" class="step-num">10</text>
     <rect x="620" y="1670" width="360" height="100" rx="18" class="blue"/>
-    <text x="800" y="1710" class="label">进入 PF-003 修改—重评</text>
+    <text x="800" y="1710" class="label">进入 PF-003 修改效果验证</text>
     <text x="800" y="1739" class="small">展示修改效果、原因和剩余问题</text>
   </g>
 

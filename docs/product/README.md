@@ -8,9 +8,9 @@ reviewers:
   - AI 负责人
   - 测试负责人
 status: draft
-version: "0.5"
+version: "0.8"
 created_at: 2026-07-23
-updated_at: 2026-07-23
+updated_at: 2026-07-24
 ---
 
 # 精投助手产品文档中心
@@ -59,6 +59,10 @@ updated_at: 2026-07-23
 | 模块 | 文档 | 模块职责 |
 |---|---|---|
 | V0.1 简历优化 Agent | [portfolio-resume-agent.md](./modules/portfolio-resume-agent.md) | 单次会话中的证据追溯、动态追问、候选生成、事实审核和用户决定 |
+| V0.1 AI 评测与安全护栏 | [ai-evaluation-and-safety-guardrails.md](./modules/ai-evaluation-and-safety-guardrails.md) | AI 候选审核、风险状态、数字与归因边界、固定评测和版本回归 |
+| PF-002 固定评测案例 | [pf002-evaluation-cases.md](./modules/pf002-evaluation-cases.md) | 12 个端到端黄金案例、30 个原子安全案例和指标覆盖 |
+| V0.1 修改效果验证 | [modification-effect-validation.md](./modules/modification-effect-validation.md) | 用户完成一轮修改后的统一验证、Diff、证据覆盖、安全状态和下一步 |
+| V0.1 预计算引导演示 | [guided-demo-mode.md](./modules/guided-demo-mode.md) | 使用真实状态结构回放 PF-001 至 PF-003 的关键闭环 |
 | 职业证据库 | [evidence-library.md](./modules/evidence-library.md) | 简历导入、事实确认、经历深挖和长期沉淀 |
 | 岗位版本与 JD 分析 | [job-version-and-jd-analysis.md](./modules/job-version-and-jd-analysis.md) | 新建岗位版本、解析 JD、识别岗位方向和要求 |
 | 证据地图与修改任务 | [evidence-map-and-tasks.md](./modules/evidence-map-and-tasks.md) | 匹配岗位要求与证据、识别缺口、生成优先级任务 |
@@ -102,6 +106,6 @@ updated_at: 2026-07-23
 - 首次使用时“两段代表经历深挖”是强制门槛还是可跳过任务。
 - 快速优化与教学模式的默认关系及切换规则。
 - “岗位投递版本完成”的最低任务条件。
-- AI 质量指标的数值门槛，需要先建立 30—50 个案例评测集。
+- AI 质量指标的数值门槛，需要先完成 12 个端到端黄金案例和 30 个原子安全案例的基线评测。
 
 已确认：V0.1 求职作品版是首个实现版本；账号、免费账号 30 天保留以及证据库导入导出进入后续产品 MVP。完整决策见 [版本规范与路线图](./00-version-specification-and-roadmap.md)。

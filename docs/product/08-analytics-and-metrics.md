@@ -7,13 +7,16 @@ reviewers:
   - 后端负责人
   - AI 负责人
 status: draft
-version: "0.2"
+version: "0.5"
 created_at: 2026-07-23
-updated_at: 2026-07-23
+updated_at: 2026-07-24
 related_docs:
   - ./01-product-prd.md
   - ./03-core-user-flows.md
   - ./09-mvp-acceptance.md
+  - ./modules/ai-evaluation-and-safety-guardrails.md
+  - ./modules/modification-effect-validation.md
+  - ./modules/guided-demo-mode.md
 ---
 
 # 精投助手指标与埋点方案
@@ -63,7 +66,7 @@ related_docs:
 | M-014 | AI 任务成功率 | succeeded AI 任务 ÷ 已受理 AI 任务 |
 | M-015 | AI P95 耗时 | 各 AI 任务类型的 95 分位耗时 |
 
-数值目标在 30—50 个案例评测和首轮可用性测试后冻结。
+数值目标在 12 个端到端黄金案例、30 个原子安全案例和首轮可用性测试后冻结。
 
 ## 4. 核心漏斗
 
@@ -111,6 +114,8 @@ related_docs:
 | `rewrite_candidate_accepted` | 直接接受 | candidate_type | M-008 |
 | `rewrite_candidate_edited` | 编辑后采用 | edit_distance_bucket | M-008/M-009 |
 | `rewrite_candidate_rejected` | 拒绝 | reason | 建议质量 |
+| `modification_validation_started` | 用户点击“完成修改并验证” | source_type, previous_validation_status, validation_sequence | 修改闭环 |
+| `modification_validation_completed` | PF-003 返回有效结果 | change_outcome, safety_status, evidence_coverage_change, validation_sequence | 修改闭环/AI 质量 |
 | `modification_task_completed` | 任务完成 | assist_level, duration_ms | M-005/M-011 |
 | `tailored_resume_generated` | 组装成功 | completed_task_count | M-006 |
 | `final_check_completed` | 检查完成 | blocker_count, warning_count | M-006 |
@@ -135,6 +140,8 @@ related_docs:
 | source | web/mobile_web 等 |
 
 AI 事件额外包含 task_type、model_version、prompt_version、schema_version、duration_ms、retry_count 和 status，不包含完整输入输出。
+
+PF-004 演示事件必须携带 `is_demo=true`，不得计入真实业务漏斗、AI 成功率、耗时、采纳率和修改效果指标。演示不创建普通 `application_id`。
 
 ## 8. 当前实现差距
 
@@ -180,4 +187,3 @@ AI 事件额外包含 task_type、model_version、prompt_version、schema_versio
 - “大幅修改”的文本差异阈值。
 - 内测、公开 MVP 和正式上线的数值目标。
 - 埋点存储方案和保留期限。
-

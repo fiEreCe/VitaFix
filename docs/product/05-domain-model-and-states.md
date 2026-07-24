@@ -7,13 +7,14 @@ reviewers:
   - AI 负责人
   - 测试负责人
 status: draft
-version: "0.2"
+version: "0.4"
 created_at: 2026-07-23
-updated_at: 2026-07-23
+updated_at: 2026-07-24
 related_docs:
   - ./03-core-user-flows.md
   - ./06-ai-product-specification.md
   - ./modules/evidence-library.md
+  - ./modules/modification-effect-validation.md
 ---
 
 # 精投助手领域模型与状态定义
@@ -172,7 +173,7 @@ UserIdentity
 | requirementRefs | 对应岗位要求 |
 | evidenceRefs | 可使用证据 |
 | targetSection | 目标经历或技能段落 |
-| status | todo/in_progress/blocked/completed/skipped_with_risk |
+| status | todo/in_progress/blocked/completed/completed_with_risk/skipped_with_risk |
 | assistLevel | demonstrate/hint/independent |
 | expectedBenefit | 完成后的改善 |
 | blockingReason | 缺事实、无证据、AI 失败等 |
@@ -189,7 +190,20 @@ UserIdentity
 
 ### 4.12 ChangeRecord
 
-不可变修改记录，包含原文、最终文本、修改原因、事实来源、JD 要求、用户动作（接受/编辑/拒绝/撤销）、时间和版本。
+不可变修改记录，包含原文、用户当前文本、修改原因、事实来源、JD 要求、用户动作（接受/编辑/拒绝/撤销）、时间和版本。
+
+用户认为本轮修改完成并主动触发 PF-003 后，追加一条不可变验证记录，保存：
+
+- 修改前快照和修改后文本。
+- 确定性文本 Diff。
+- `changeOutcome`：`improved/unchanged/regressed/tradeoff`。
+- `safetyStatus`：`passed/warning/blocked/unavailable`。
+- 证据覆盖变化。
+- 改善点、剩余问题和下一步。
+
+每次验证记录还保存模型、Prompt、Schema、规则版本和验证时间。页面默认读取最新一条记录，同时保留任务最初原文；V0.1 不提供任意历史版本自由比较。
+
+用户普通编辑和自动保存不创建验证记录；编辑后必须移除旧的 AI 验证状态，直到用户点击“完成修改并验证”。`blocked` 文本允许保存和使用，但任务只能进入 `completed_with_risk`。
 
 ### 4.13 TailoredResumeVersion
 
@@ -244,9 +258,10 @@ completed → editing（用户重新打开修改）
 ```text
 todo → in_progress → completed
   ├→ blocked ──补充事实/重试──> in_progress
-  └→ skipped_with_risk
+  ├→ completed_with_risk（用户保留被 PF-003 阻断的自写内容）
+  └→ skipped_with_risk（用户跳过任务或未处理风险）
 
-completed → in_progress（相关事实或 JD 变化导致失效）
+completed/completed_with_risk → in_progress（用户再次编辑，或相关事实/JD 变化导致失效）
 ```
 
 ### 5.5 AI 任务
@@ -299,4 +314,3 @@ resolved → open（内容变化后重新检查发现问题）
 - 原始文件和原始文本保留时长。
 - 被引用事实的删除是软删除还是立即物理删除。
 - 用户手工保存红色内容时是否允许岗位版本进入完成状态。
-
