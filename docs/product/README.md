@@ -8,7 +8,7 @@ reviewers:
   - AI 负责人
   - 测试负责人
 status: draft
-version: "0.8"
+version: "0.9"
 created_at: 2026-07-23
 updated_at: 2026-07-24
 ---
@@ -53,6 +53,7 @@ updated_at: 2026-07-24
 | [07-exceptions-privacy-and-permissions.md](./07-exceptions-privacy-and-permissions.md) | 异常恢复、权限、隐私和删除 | 已形成需求草案 |
 | [08-analytics-and-metrics.md](./08-analytics-and-metrics.md) | 指标口径、漏斗和埋点事件 | 已形成需求草案 |
 | [09-mvp-acceptance.md](./09-mvp-acceptance.md) | 端到端验收、AI 门槛和上线阻断条件 | 已形成需求草案 |
+| [10-v0.1-development-readiness-and-execution-plan.md](./10-v0.1-development-readiness-and-execution-plan.md) | 开发准入、技术前置、实施顺序和阶段退出条件 | 已批准执行基线 |
 
 ## 4. 模块规格
 
@@ -83,15 +84,16 @@ updated_at: 2026-07-24
 | 失败、删除、隐私如何处理 | 07 异常与隐私 |
 | 如何统计产品效果 | 08 指标与埋点 |
 | 什么算开发完成和可上线 | 09 MVP 验收 |
+| 当前是否可以开发、先做什么、何时进入下一阶段 | 10 开发准入与执行顺序 |
 | 模块内部业务规则 | 对应模块规格 |
 
 ## 6. 推荐阅读顺序
 
-- 产品与管理：00 → 01 → 03 → 模块规格 → 08 → 09
+- 产品与管理：00 → 01 → 03 → 模块规格 → 10 → 08 → 09
 - 设计：01 → 02 → 03 → 04 → 07
 - 前端：02 → 03 → 04 → 05 → 模块规格
-- 后端与 AI：01 → 05 → 06 → 07 → 模块规格
-- 测试：03 → 04 → 05 → 07 → 09
+- 后端与 AI：01 → 05 → 06 → 07 → 模块规格 → 10
+- 测试：03 → 04 → 05 → 07 → 模块规格 → 10 → 09
 
 ## 7. 文档治理
 
