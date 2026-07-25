@@ -150,8 +150,15 @@ class AgentOrchestrator {
     const baselineText = task.validationBaseline || task.candidate?.text || this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n');
     const record = validate({ baselineText, currentText, facts: this._factsForTask(session, task), factRefs: task.candidate?.factRefs || task.factIds, semanticJudge: this.tools.evaluateModification });
     task.validationRecords = [...(task.validationRecords || []), record]; task.validationBaseline = currentText; task.currentText = currentText;
-    task.state = record.safetyStatus === 'blocked' ? 'completed_with_risk' : 'ready_for_reevaluation';
+    task.state = record.safetyStatus === 'blocked' ? 'user_edited' : 'ready_for_reevaluation';
     this._transition(session, task, task.state, 'MODIFICATION_VALIDATED', 'evaluateModification');
+    return this.repository.save(session);
+  }
+
+  async completeWithRisk(id, taskId) {
+    const session = await this._get(id); const task = this._task(session, taskId); const latest = task.validationRecords?.at(-1);
+    if (latest?.safetyStatus !== 'blocked') throw new Error('RISK_ACKNOWLEDGEMENT_NOT_AVAILABLE');
+    task.state = 'completed_with_risk'; this._transition(session, task, task.state, 'RISK_ACKNOWLEDGED');
     return this.repository.save(session);
   }
 

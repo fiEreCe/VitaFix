@@ -77,3 +77,11 @@ test('PF-003 appends a validation record without overwriting the user text', asy
   const updated = await app.validateModification(session.id, 'task-1', '参与用户访谈并整理反馈');
   assert.equal(updated.tasks[0].validationRecords.length, 1); assert.equal(updated.tasks[0].currentText, '参与用户访谈并整理反馈');
 });
+
+test('PF-003 requires explicit acknowledgement before completing with risk', async () => {
+  const store = new Map(); const repository = { async create(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); }, async get(id) { return store.get(id); }, async save(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); } };
+  const app = new AgentOrchestrator({ repository, tools: {} }); const session = await app.createSession({ userId: 'u1', jdText: 'JD', resumeText: 'resume' });
+  session.tasks = [{ id: 'task-1', factIds: ['f1'], state: 'user_edited', candidate: { text: '参与访谈', factRefs: ['f1'] } }]; session.resumeFacts = [{ id: 'f1', sourceText: '参与用户访谈', confirmation: 'confirmed' }];
+  const validated = await app.validateModification(session.id, 'task-1', '参与500位用户访谈'); assert.equal(validated.tasks[0].state, 'user_edited');
+  const completed = await app.completeWithRisk(session.id, 'task-1'); assert.equal(completed.tasks[0].state, 'completed_with_risk');
+});

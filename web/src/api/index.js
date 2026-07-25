@@ -137,6 +137,7 @@ export const agentSessionApi = {
   generate(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/generate`, { method: 'POST' }) },
   retry(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/retry`, { method: 'POST' }) },
   validate(id, taskId, text) { return request(`/agent-sessions/${id}/tasks/${taskId}/validate`, { method: 'POST', data: { text } }) },
+  completeWithRisk(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/complete-with-risk`, { method: 'POST' }) },
   decide(id, taskId, decision) { return request(`/agent-sessions/${id}/tasks/${taskId}/decision`, { method: 'POST', data: decision }) },
   returnControl(id, taskId, action, text = '') { return request(`/agent-sessions/${id}/tasks/${taskId}/return-control`, { method: 'POST', data: { action, text } }) },
   handoff(id) { return request(`/agent-sessions/${id}/handoff`) },
