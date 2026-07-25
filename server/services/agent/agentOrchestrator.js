@@ -116,6 +116,7 @@ class AgentOrchestrator {
   async decide(id, taskId, decision) {
     const session = await this._get(id); const task = this._task(session, taskId);
     if (decision.type === 'user_edited') {
+      task.validationBaseline = task.validationBaseline || task.candidate?.text || this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n');
       task.candidate = { text: decision.text, contentSource: 'user_edited', verification: inspectUserEdit(decision.text, this._factsForTask(session, task)) };
       task.state = 'user_edited';
     } else {

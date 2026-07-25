@@ -1,0 +1,12 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { AgentOrchestrator } = require('../services/agent/agentOrchestrator');
+
+test('PF-001 through PF-004 closes a verified evidence-driven loop', async () => {
+  const store = new Map(); const repository = { async create(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); }, async get(id) { return store.get(id); }, async save(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); } };
+  const app = new AgentOrchestrator({ repository, tools: { parseJD: async () => ({ requirements: [{ id: 'r1', sourceText: '用户研究', priority: 1 }] }), parseResume: async () => ({ facts: [{ id: 'f1', sourceText: '参与用户访谈', action: '参与访谈', context: '校园产品', contribution: '团队共同完成', confirmation: 'confirmed' }] }), matchEvidence: async () => ({ matches: [{ requirementId: 'r1', factIds: ['f1'], gapType: 'expression', priority: 1 }] }), draftRevision: async () => ({ text: '参与用户访谈并整理反馈', factRefs: ['f1'] }) } });
+  const created = await app.createSession({ userId: 'u1', jdText: 'JD', resumeText: 'resume' }); const analysed = await app.startAnalysis(created.id); const taskId = analysed.tasks[0].id;
+  await app.selectTask(created.id, taskId); const candidate = await app.generateCandidate(created.id, taskId); assert.equal(candidate.tasks[0].candidate.verification.status, 'passed');
+  await app.decide(created.id, taskId, { type: 'user_edited', text: '参与校园产品用户访谈并整理反馈' }); const validated = await app.validateModification(created.id, taskId, '参与校园产品用户访谈并整理反馈');
+  assert.equal(validated.tasks[0].validationRecords.at(-1).safetyStatus, 'passed'); assert.equal(validated.tasks[0].validationRecords.at(-1).changeOutcome, 'improved');
+});
