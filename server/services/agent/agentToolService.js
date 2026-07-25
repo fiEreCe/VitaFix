@@ -1,5 +1,6 @@
 const jdParser = require('../jdParser');
 const resumeParser = require('../resumeParser');
+const auditService = require('./agentAuditService');
 
 const words = (value) => new Set(String(value || '').toLowerCase().match(/[\u4e00-\u9fa5]{2,}|[a-z]+/g) || []);
 
@@ -33,5 +34,6 @@ class AgentToolService {
     return { text, factRefs: facts.map((item) => item.id), requirementRefs: [requirement.id], rationaleSummary: `对应岗位要求：${requirement.sourceText}` };
   }
   async repairRevision({ requirement, facts, sufficiency }) { return this.draftRevision({ requirement, facts, sufficiency }); }
+  async verifyRevision(input) { return auditService.verifyRevision(input); }
 }
 module.exports = new AgentToolService();

@@ -135,6 +135,7 @@ export const agentSessionApi = {
   answer(id, taskId, answer) { return request(`/agent-sessions/${id}/tasks/${taskId}/answers`, { method: 'POST', data: { answer } }) },
   reviewFact(id, taskId, factId, decision, fact) { return request(`/agent-sessions/${id}/tasks/${taskId}/facts/${factId}`, { method: 'PATCH', data: { decision, fact } }) },
   generate(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/generate`, { method: 'POST' }) },
+  retry(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/retry`, { method: 'POST' }) },
   decide(id, taskId, decision) { return request(`/agent-sessions/${id}/tasks/${taskId}/decision`, { method: 'POST', data: decision }) },
   returnControl(id, taskId, action, text = '') { return request(`/agent-sessions/${id}/tasks/${taskId}/return-control`, { method: 'POST', data: { action, text } }) },
   handoff(id) { return request(`/agent-sessions/${id}/handoff`) },

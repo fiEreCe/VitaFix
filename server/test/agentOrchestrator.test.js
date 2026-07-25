@@ -46,3 +46,26 @@ test('repairs an unsafe draft once before presenting it', async () => {
   assert.equal(result.tasks[0].state, 'awaiting_user_decision');
   assert.equal(result.tasks[0].repairAttempts, 1);
 });
+
+test('preserves the task and retries when evaluation is unavailable', async () => {
+  const store = new Map(); let drafts = 0;
+  const repository = { async create(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); }, async get(id) { return store.get(id); }, async save(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); } };
+  const app = new AgentOrchestrator({ repository, tools: { draftRevision: async () => (++drafts < 3 ? { text: '', factRefs: [] } : { text: '参与用户访谈', factRefs: ['fact-1'] }) } });
+  const session = await app.createSession({ userId: 'u1', jdText: 'JD', resumeText: 'resume' });
+  session.requirements = [{ id: 'req-1', sourceText: '用户研究' }]; session.resumeFacts = [{ id: 'fact-1', sourceText: '参与访谈', action: '参与访谈', context: '用户', contribution: '团队共同完成', confirmation: 'confirmed' }]; session.tasks = [{ id: 'task-1', requirementId: 'req-1', factIds: ['fact-1'], state: 'generating', effectiveRounds: 0 }];
+  const failed = await app.generateCandidate(session.id, 'task-1');
+  assert.equal(failed.tasks[0].state, 'verification_failed');
+  assert.equal(failed.tasks[0].candidate.verification.status, 'unavailable');
+  const retried = await app.retryCurrentStep(session.id, 'task-1');
+  assert.equal(retried.tasks[0].state, 'awaiting_user_decision');
+  assert.equal(retried.tasks[0].retryCount, 1);
+});
+
+test('never adopts a blocked or unreviewed AI candidate', async () => {
+  const store = new Map();
+  const repository = { async create(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); }, async get(id) { return store.get(id); }, async save(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); } };
+  const app = new AgentOrchestrator({ repository, tools: {} });
+  const session = await app.createSession({ userId: 'u1', jdText: 'JD', resumeText: 'resume' });
+  session.tasks = [{ id: 'task-1', factIds: [], state: 'generation_failed', candidate: { text: 'unsafe', verification: { status: 'blocked' } } }];
+  await assert.rejects(() => app.decide(session.id, 'task-1', { type: 'accepted' }), /CANDIDATE_NOT_ADOPTABLE/);
+});

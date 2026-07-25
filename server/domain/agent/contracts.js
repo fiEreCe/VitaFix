@@ -14,7 +14,7 @@ const ANSWER_QUALITIES = Object.freeze(['relevant', 'partial', 'off_topic', 'con
 const FACT_CONFIRMATIONS = Object.freeze(['extracted', 'pending_confirmation', 'confirmed', 'corrected', 'rejected']);
 const SUFFICIENCY = Object.freeze(['strong', 'basic', 'insufficient']);
 const GAP_TYPES = Object.freeze(['expression', 'information', 'capability']);
-const VERIFICATION_RESULTS = Object.freeze(['passed', 'repairable', 'needs_confirmation', 'unsupported', 'system_error']);
+const VERIFICATION_RESULTS = Object.freeze(['passed', 'warning', 'blocked', 'unavailable', 'repairable', 'needs_confirmation', 'unsupported', 'system_error']);
 
 function fail(code) {
   const error = new Error(code);

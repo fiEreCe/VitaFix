@@ -3,12 +3,12 @@ const { SESSION_STATES, TASK_STATES, FACT_CONFIRMATIONS } = require('../domain/a
 
 const factSchema = new mongoose.Schema({
   id: String, sourceText: String, action: String, context: String, contribution: String,
-  method: String, result: String, quantity: String, confirmation: { type: String, enum: FACT_CONFIRMATIONS },
+  method: String, result: String, quantity: String, quantityType: { type: String, enum: ['exact', 'estimated', 'unconfirmed'] }, confirmation: { type: String, enum: FACT_CONFIRMATIONS },
 }, { _id: false });
 const taskSchema = new mongoose.Schema({
   id: String, requirementId: String, factIds: [String], gapType: String, priority: Number,
   state: { type: String, enum: TASK_STATES }, effectiveRounds: Number, clarificationUsed: Boolean,
-  confirmedFacts: [factSchema], candidate: mongoose.Schema.Types.Mixed, recommended: Boolean, sufficiency: String,
+  confirmedFacts: [factSchema], candidate: mongoose.Schema.Types.Mixed, recommended: Boolean, sufficiency: String, retryCount: Number, repairAttempts: Number, evaluationRetryAttempts: Number,
 }, { _id: false });
 const transitionSchema = new mongoose.Schema({ from: String, to: String, event: String, toolName: String, at: String }, { _id: false });
 const schema = new mongoose.Schema({

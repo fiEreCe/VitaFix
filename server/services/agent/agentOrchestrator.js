@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { calculateSufficiency } = require('../../domain/agent/policy');
-const { verifyCandidate, inspectUserEdit } = require('../../domain/agent/guardrails');
+const { inspectUserEdit } = require('../../domain/agent/guardrails');
+const { evaluateCandidate } = require('./pf002Evaluator');
 
 class AgentOrchestrator {
   constructor({ repository, tools }) {
@@ -56,16 +57,34 @@ class AgentOrchestrator {
     task.sufficiency = facts.length ? calculateSufficiency(facts[0]) : 'insufficient';
     if (task.sufficiency === 'insufficient') { task.state = 'questioning'; return this.repository.save(session); }
     const requirement = session.requirements.find((item) => item.id === task.requirementId);
-    let candidate = await this.tools.draftRevision({ requirement, facts, sufficiency: task.sufficiency });
-    let verification = verifyCandidate(candidate, facts);
+    const draft = async () => {
+      try { return await this.tools.draftRevision({ requirement, facts, sufficiency: task.sufficiency }); }
+      catch (error) { return { text: '', factRefs: [], generationError: error.message }; }
+    };
+    const audit = async (value) => {
+      try { return this.tools.verifyRevision ? await this.tools.verifyRevision({ candidate: value, facts, requirement }) : evaluateCandidate(value, facts); }
+      catch (error) { return { status: 'unavailable', findings: [{ type: 'evaluation_unavailable', message: error.message }] }; }
+    };
+    let candidate = await draft();
+    let verification = await audit(candidate);
+    task.evaluationRetryAttempts = 0;
+    if (verification.status === 'unavailable') {
+      task.evaluationRetryAttempts = 1;
+      candidate = await draft();
+      verification = await audit(candidate);
+    }
     task.repairAttempts = 0;
-    if (verification.status !== 'passed' && typeof this.tools.repairRevision === 'function') {
+    if (verification.status === 'blocked' && typeof this.tools.repairRevision === 'function') {
       task.repairAttempts = 1;
-      candidate = await this.tools.repairRevision({ requirement, facts, candidate, findings: verification.findings, sufficiency: task.sufficiency });
-      verification = verifyCandidate(candidate, facts);
+      try {
+        candidate = await this.tools.repairRevision({ requirement, facts, candidate, findings: verification.findings, sufficiency: task.sufficiency });
+        verification = await audit(candidate);
+      } catch (error) {
+        verification = { status: 'unavailable', findings: [{ type: 'repair_unavailable', message: error.message }] };
+      }
     }
     task.candidate = { ...candidate, verification, contentSource: 'ai_generated' };
-    task.state = verification.status === 'passed' ? 'awaiting_user_decision' : 'generation_failed';
+    task.state = ['passed', 'warning'].includes(verification.status) ? 'awaiting_user_decision' : verification.status === 'unavailable' ? 'verification_failed' : 'generation_failed';
     this._transition(session, task, task.state, 'CANDIDATE_GENERATED', 'draftRevision');
     return this.repository.save(session);
   }
@@ -98,7 +117,11 @@ class AgentOrchestrator {
     if (decision.type === 'user_edited') {
       task.candidate = { text: decision.text, contentSource: 'user_edited', verification: inspectUserEdit(decision.text, this._factsForTask(session, task)) };
       task.state = 'user_edited';
-    } else task.state = decision.type;
+    } else {
+      if (!['accepted', 'rejected', 'skipped'].includes(decision.type)) throw new Error('INVALID_DECISION');
+      if (decision.type === 'accepted' && (task.state !== 'awaiting_user_decision' || !['passed', 'warning'].includes(task.candidate?.verification?.status))) throw new Error('CANDIDATE_NOT_ADOPTABLE');
+      task.state = decision.type;
+    }
     if (!['accepted', 'rejected', 'skipped', 'user_edited'].includes(task.state)) throw new Error('INVALID_DECISION');
     if (['accepted', 'user_edited'].includes(task.state)) {
       session.handoff = { taskId, originalText: this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n'), finalText: task.candidate?.text || '', factRefs: task.candidate?.factRefs || task.factIds, contentSource: task.candidate?.contentSource || 'ai_generated', verificationStatus: task.candidate?.verification?.status || 'unavailable', riskAcknowledged: Boolean(decision.riskAcknowledged) };
@@ -119,6 +142,17 @@ class AgentOrchestrator {
   }
 
   async getHandoff(id) { const session = await this._get(id); return session.handoff || null; }
+
+  async retryCurrentStep(id, taskId) {
+    const session = await this._get(id); const task = this._task(session, taskId);
+    if (!['generation_failed', 'verification_failed'].includes(task.state)) throw new Error('TASK_NOT_RETRYABLE');
+    if ((task.retryCount || 0) >= 3) throw new Error('TASK_RETRY_LIMIT_REACHED');
+    task.retryCount = (task.retryCount || 0) + 1;
+    task.state = 'generating';
+    this._transition(session, task, task.state, 'RETRY_REQUESTED');
+    await this.repository.save(session);
+    return this.generateCandidate(id, taskId);
+  }
 
   async _get(id) { const value = await this.repository.get(id); if (!value) throw new Error('AGENT_SESSION_NOT_FOUND'); return value; }
   _task(session, id) { const task = session.tasks.find((item) => item.id === id); if (!task) throw new Error('AGENT_TASK_NOT_FOUND'); return task; }
