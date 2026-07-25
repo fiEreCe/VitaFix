@@ -20,3 +20,15 @@ test('runs a recommended task through fact confirmation and a verified candidate
   assert.equal(result.tasks[0].state, 'awaiting_user_decision');
   assert.equal(result.tasks[0].candidate.verification.status, 'passed');
 });
+
+test('answer creates a pending fact which requires confirmation', async () => {
+  const store = new Map();
+  const repository = { async create(value) { store.set(value.id, structuredClone(value)); return store.get(value.id); }, async get(id) { return store.get(id); }, async save(value) { store.set(value.id, structuredClone(value)); return store.get(value.id); } };
+  const app = new AgentOrchestrator({ repository, tools: {} });
+  await app.createSession({ userId: 'u1', jdText: 'JD', resumeText: '简历' });
+  const session = [...store.values()][0]; session.tasks = [{ id: 'task-1', factIds: [], state: 'questioning', effectiveRounds: 0, clarificationUsed: false }];
+  await app.submitAnswer(session.id, 'task-1', '我独立设计了校园用户访谈提纲');
+  const updated = await repository.get(session.id);
+  assert.equal(updated.resumeFacts.at(-1).confirmation, 'pending_confirmation');
+  assert.equal(updated.tasks[0].state, 'awaiting_fact_confirmation');
+});

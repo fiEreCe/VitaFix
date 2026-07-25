@@ -18,6 +18,8 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
     async get(req, res) { const session = await repository.get(req.params.id, req.userId); return session ? res.json(session) : res.status(404).json({ error: { code: 'AGENT_SESSION_NOT_FOUND' } }); },
     async start(req, res) { try { res.json(await app.startAnalysis(req.params.id)); } catch (error) { fail(res, error); } },
     async selectTask(req, res) { try { res.json(await app.selectTask(req.params.id, req.params.taskId)); } catch (error) { fail(res, error); } },
+    async answer(req, res) { try { if (!req.body?.answer?.trim()) throw new Error('ANSWER_REQUIRED'); res.json(await app.submitAnswer(req.params.id, req.params.taskId, req.body.answer.trim())); } catch (error) { fail(res, error); } },
+    async reviewFact(req, res) { try { res.json(await app.reviewFact(req.params.id, req.params.taskId, req.params.factId, req.body?.decision, req.body?.fact)); } catch (error) { fail(res, error); } },
     async generate(req, res) { try { res.json(await app.generateCandidate(req.params.id, req.params.taskId)); } catch (error) { fail(res, error); } },
     async decide(req, res) { try { res.json(await app.decide(req.params.id, req.params.taskId, req.body)); } catch (error) { fail(res, error); } },
   };

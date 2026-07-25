@@ -12,7 +12,8 @@
       </van-cell></section>
       <template v-if="task">
         <section class="card"><h3>岗位依据</h3><p>{{ requirement(task).sourceText }}</p><h3>可用事实</h3><p v-for="fact in facts(task)" :key="fact.id">{{ fact.sourceText }}</p></section>
-        <section v-if="task.state === 'questioning'" class="card"><h3>信息仍不足</h3><p>请补充你本人具体做了什么、服务的对象，以及使用的方法或产出。</p><van-button type="primary" block round @click="generate">已有信息，尝试生成保守表达</van-button></section>
+        <section v-if="task.state === 'questioning'" class="card"><h3>补充一个关键事实</h3><p>请补充你本人具体做了什么、服务的对象，以及使用的方法或产出。</p><van-field v-model="answer" rows="3" autosize type="textarea" placeholder="例如：我设计访谈提纲并整理了用户洞察" /><van-button type="primary" block round :loading="busy" @click="submitAnswer">提交并确认事实</van-button></section>
+        <section v-if="task.state === 'awaiting_fact_confirmation'" class="card"><h3>请确认提取的事实</h3><p>{{ pendingFact(task)?.sourceText }}</p><van-button type="primary" block round :loading="busy" @click="reviewFact('confirm')">确认无误</van-button><van-button plain block round style="margin-top:8px" @click="reviewFact('reject')">不是这个意思</van-button></section>
         <section v-if="task.state === 'generating' || task.state === 'assessing_evidence'" class="card"><van-button type="primary" block round :loading="busy" @click="generate">生成候选表达</van-button></section>
         <section v-if="task.candidate" class="card"><h3>候选表达</h3><p class="candidate">{{ task.candidate.text }}</p><van-tag :type="task.candidate.verification.status === 'passed' ? 'success' : 'danger'">{{ task.candidate.verification.status }}</van-tag><p>{{ task.candidate.rationaleSummary }}</p>
           <van-button v-if="task.state === 'awaiting_user_decision'" type="primary" block round :loading="busy" @click="decide('accepted')">采用这条表达</van-button>
@@ -26,13 +27,16 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { agentSessionApi } from '../api'
-const route = useRoute(); const session = ref(null); const loading = ref(true); const error = ref(false); const busy = ref(false); const actionError = ref(''); const selectedId = ref('')
+const route = useRoute(); const session = ref(null); const loading = ref(true); const error = ref(false); const busy = ref(false); const actionError = ref(''); const selectedId = ref(''); const answer = ref('')
 const task = computed(() => session.value?.tasks.find((item) => item.id === selectedId.value) || session.value?.tasks.find((item) => item.recommended))
 const requirement = (item) => session.value.requirements.find((entry) => entry.id === item.requirementId) || { sourceText: '岗位要求' }
 const facts = (item) => session.value.resumeFacts.filter((fact) => item.factIds.includes(fact.id))
+const pendingFact = (item) => session.value.resumeFacts.find((fact) => fact.id === item.pendingFactId)
 async function load() { loading.value = true; error.value = false; try { session.value = await agentSessionApi.get(route.params.id) } catch (_) { error.value = true } finally { loading.value = false } }
 function select(item) { selectedId.value = item.id; if (item.state === 'pending') run(() => agentSessionApi.selectTask(route.params.id, item.id)) }
 function generate() { run(() => agentSessionApi.generate(route.params.id, task.value.id)) }
+function submitAnswer() { if (!answer.value.trim()) return; run(async () => { await agentSessionApi.answer(route.params.id, task.value.id, answer.value); answer.value = '' }) }
+function reviewFact(decision) { const fact = pendingFact(task.value); if (fact) run(() => agentSessionApi.reviewFact(route.params.id, task.value.id, fact.id, decision)) }
 function decide(type) { run(() => agentSessionApi.decide(route.params.id, task.value.id, { type })) }
 async function run(command) { busy.value = true; actionError.value = ''; try { await command(); await load() } catch (e) { actionError.value = e.message } finally { busy.value = false } }
 onMounted(load)

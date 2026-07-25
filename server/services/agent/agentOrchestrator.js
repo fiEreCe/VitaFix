@@ -64,6 +64,26 @@ class AgentOrchestrator {
     return this.repository.save(session);
   }
 
+  async submitAnswer(id, taskId, answer) {
+    const session = await this._get(id); const task = this._task(session, taskId);
+    const fact = { id: `fact-${session.resumeFacts.length + 1}`, sourceText: answer, action: answer, context: '', contribution: '', method: '', result: '', quantity: '', confirmation: 'pending_confirmation' };
+    session.resumeFacts.push(fact); task.factIds.push(fact.id); task.effectiveRounds += 1; task.pendingFactId = fact.id; task.state = 'awaiting_fact_confirmation';
+    this._transition(session, task, task.state, 'ANSWER_SUBMITTED');
+    return this.repository.save(session);
+  }
+
+  async reviewFact(id, taskId, factId, decision, factPatch = {}) {
+    const session = await this._get(id); const task = this._task(session, taskId); const fact = session.resumeFacts.find((item) => item.id === factId);
+    if (!fact) throw new Error('AGENT_FACT_NOT_FOUND');
+    if (decision === 'correct') Object.assign(fact, factPatch, { confirmation: 'corrected' });
+    else if (decision === 'confirm') fact.confirmation = 'confirmed';
+    else if (decision === 'reject') fact.confirmation = 'rejected';
+    else throw new Error('INVALID_FACT_DECISION');
+    task.state = decision === 'reject' ? 'questioning' : 'generating';
+    this._transition(session, task, task.state, 'FACT_REVIEWED');
+    return this.repository.save(session);
+  }
+
   async decide(id, taskId, decision) {
     const session = await this._get(id); const task = this._task(session, taskId);
     if (decision.type === 'user_edited') {
