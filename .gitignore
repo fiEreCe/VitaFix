@@ -26,3 +26,6 @@ Thumbs.db
 
 # Visual brainstorming artifacts
 .superpowers/
+
+# Isolated implementation worktrees
+.worktrees/
