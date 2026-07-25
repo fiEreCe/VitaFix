@@ -29,6 +29,7 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
     reviewFact: command((req) => app.reviewFact(req.params.id, req.params.taskId, req.params.factId, req.body?.decision, req.body?.fact)),
     generate: command((req) => app.generateCandidate(req.params.id, req.params.taskId)),
     retry: command((req) => app.retryCurrentStep(req.params.id, req.params.taskId)),
+    validateModification: command((req) => { if (!req.body?.text?.trim()) throw new Error('TEXT_REQUIRED'); return app.validateModification(req.params.id, req.params.taskId, req.body.text); }),
     decide: command((req) => app.decide(req.params.id, req.params.taskId, req.body)),
     returnControl: command((req) => app.chooseReturnControl(req.params.id, req.params.taskId, req.body?.action, req.body?.text)),
     handoff: command((req) => app.getHandoff(req.params.id)),

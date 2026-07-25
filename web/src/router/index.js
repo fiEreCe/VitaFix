@@ -37,6 +37,7 @@ const routes = [
     name: 'AgentWorkbench',
     component: () => import('../views/AgentWorkbench.vue'),
   },
+  { path: '/demo', name: 'GuidedDemo', component: () => import('../views/GuidedDemo.vue') },
 ]
 
 const router = createRouter({

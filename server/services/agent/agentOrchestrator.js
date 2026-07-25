@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { calculateSufficiency } = require('../../domain/agent/policy');
 const { inspectUserEdit } = require('../../domain/agent/guardrails');
 const { evaluateCandidate } = require('./pf002Evaluator');
+const { validate } = require('./modificationValidator');
 
 class AgentOrchestrator {
   constructor({ repository, tools }) {
@@ -142,6 +143,16 @@ class AgentOrchestrator {
   }
 
   async getHandoff(id) { const session = await this._get(id); return session.handoff || null; }
+
+  async validateModification(id, taskId, currentText) {
+    const session = await this._get(id); const task = this._task(session, taskId);
+    const baselineText = task.validationBaseline || task.candidate?.text || this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n');
+    const record = validate({ baselineText, currentText, facts: this._factsForTask(session, task), factRefs: task.candidate?.factRefs || task.factIds, semanticJudge: this.tools.evaluateModification });
+    task.validationRecords = [...(task.validationRecords || []), record]; task.validationBaseline = currentText; task.currentText = currentText;
+    task.state = record.safetyStatus === 'blocked' ? 'completed_with_risk' : 'ready_for_reevaluation';
+    this._transition(session, task, task.state, 'MODIFICATION_VALIDATED', 'evaluateModification');
+    return this.repository.save(session);
+  }
 
   async retryCurrentStep(id, taskId) {
     const session = await this._get(id); const task = this._task(session, taskId);

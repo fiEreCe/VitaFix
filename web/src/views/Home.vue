@@ -11,6 +11,7 @@
         </svg>
         开始新分析
       </button>
+      <button class="demo-btn" @click="$router.push('/demo')">查看引导演示</button>
     </div>
 
     <!-- 历史记录 -->
@@ -145,6 +146,7 @@ function startNewAnalysis() {
   opacity: 0.85;
   transform: scale(0.97);
 }
+.demo-btn{display:block;margin:12px auto 0;background:none;border:0;color:var(--color-primary);font:inherit;cursor:pointer}
 
 /* Section */
 .section {

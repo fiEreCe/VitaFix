@@ -7,6 +7,7 @@ const TASK_STATES = Object.freeze([
   'pending', 'assessing_evidence', 'questioning', 'awaiting_fact_confirmation',
   'generating', 'verifying', 'awaiting_user_decision', 'accepted', 'user_edited',
   'rejected', 'skipped', 'capability_gap', 'ready_for_reevaluation',
+  'completed_with_risk',
   'parse_failed', 'match_failed', 'question_failed', 'generation_failed', 'verification_failed',
 ]);
 

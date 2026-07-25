@@ -1,0 +1,1 @@
+export const demoFixture = Object.freeze({ version: 'pf004-1', isDemo: true, jd: '产品岗位：具备用户研究与需求分析能力', fact: '参与校园产品用户访谈并整理反馈', gap: '事实存在，但个人贡献表达不足', question: '你本人具体负责了哪一步？', answer: '我设计访谈提纲并整理访谈反馈', candidate: '参与校园产品用户访谈，设计访谈提纲并整理反馈', safetyStatus: 'passed', before: '参与用户访谈', after: '参与校园产品用户访谈，设计访谈提纲并整理反馈', changeOutcome: 'improved' })
