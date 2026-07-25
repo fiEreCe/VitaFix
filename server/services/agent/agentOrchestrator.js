@@ -56,8 +56,14 @@ class AgentOrchestrator {
     task.sufficiency = facts.length ? calculateSufficiency(facts[0]) : 'insufficient';
     if (task.sufficiency === 'insufficient') { task.state = 'questioning'; return this.repository.save(session); }
     const requirement = session.requirements.find((item) => item.id === task.requirementId);
-    const candidate = await this.tools.draftRevision({ requirement, facts, sufficiency: task.sufficiency });
-    const verification = verifyCandidate(candidate, facts);
+    let candidate = await this.tools.draftRevision({ requirement, facts, sufficiency: task.sufficiency });
+    let verification = verifyCandidate(candidate, facts);
+    task.repairAttempts = 0;
+    if (verification.status !== 'passed' && typeof this.tools.repairRevision === 'function') {
+      task.repairAttempts = 1;
+      candidate = await this.tools.repairRevision({ requirement, facts, candidate, findings: verification.findings, sufficiency: task.sufficiency });
+      verification = verifyCandidate(candidate, facts);
+    }
     task.candidate = { ...candidate, verification, contentSource: 'ai_generated' };
     task.state = verification.status === 'passed' ? 'awaiting_user_decision' : 'generation_failed';
     this._transition(session, task, task.state, 'CANDIDATE_GENERATED', 'draftRevision');

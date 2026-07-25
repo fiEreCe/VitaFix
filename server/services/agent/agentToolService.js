@@ -32,5 +32,6 @@ class AgentToolService {
       : `${fact.action || fact.sourceText}，在${fact.context || '相关场景'}中${fact.method ? `通过${fact.method}` : '推进'}，${fact.result || '形成可验证产出'}。`;
     return { text, factRefs: facts.map((item) => item.id), requirementRefs: [requirement.id], rationaleSummary: `对应岗位要求：${requirement.sourceText}` };
   }
+  async repairRevision({ requirement, facts, sufficiency }) { return this.draftRevision({ requirement, facts, sufficiency }); }
 }
 module.exports = new AgentToolService();

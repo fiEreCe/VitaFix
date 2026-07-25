@@ -32,3 +32,17 @@ test('answer creates a pending fact which requires confirmation', async () => {
   assert.equal(updated.resumeFacts.at(-1).confirmation, 'pending_confirmation');
   assert.equal(updated.tasks[0].state, 'awaiting_fact_confirmation');
 });
+
+test('repairs an unsafe draft once before presenting it', async () => {
+  const store = new Map();
+  const repository = { async create(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); }, async get(id) { return store.get(id); }, async save(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); } };
+  const app = new AgentOrchestrator({ repository, tools: {
+    draftRevision: async () => ({ text: '独立收集500份样本', factRefs: ['fact-1'], requirementRefs: ['req-1'] }),
+    repairRevision: async () => ({ text: '参与用户问卷设计', factRefs: ['fact-1'], requirementRefs: ['req-1'] }),
+  } });
+  const session = await app.createSession({ userId: 'u1', jdText: 'JD', resumeText: '简历' });
+  session.requirements = [{ id: 'req-1', sourceText: '用户研究' }]; session.resumeFacts = [{ id: 'fact-1', sourceText: '参与问卷设计', action: '参与问卷设计', context: '用户', contribution: '团队共同完成', confirmation: 'confirmed' }]; session.tasks = [{ id: 'task-1', requirementId: 'req-1', factIds: ['fact-1'], state: 'generating', effectiveRounds: 0 }];
+  const result = await app.generateCandidate(session.id, 'task-1');
+  assert.equal(result.tasks[0].state, 'awaiting_user_decision');
+  assert.equal(result.tasks[0].repairAttempts, 1);
+});
