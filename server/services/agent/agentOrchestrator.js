@@ -66,6 +66,9 @@ class AgentOrchestrator {
 
   async submitAnswer(id, taskId, answer) {
     const session = await this._get(id); const task = this._task(session, taskId);
+    if (task.effectiveRounds >= 3) { task.state = 'return_control'; return this.repository.save(session); }
+    if (['不记得', '无法证明'].includes(answer)) { task.effectiveRounds += 1; task.state = task.effectiveRounds >= 3 ? 'return_control' : 'questioning'; return this.repository.save(session); }
+    if (answer === '没有做过') { task.state = 'capability_gap'; task.gapType = 'capability'; return this.repository.save(session); }
     const fact = { id: `fact-${session.resumeFacts.length + 1}`, sourceText: answer, action: answer, context: '', contribution: '', method: '', result: '', quantity: '', confirmation: 'pending_confirmation' };
     session.resumeFacts.push(fact); task.factIds.push(fact.id); task.effectiveRounds += 1; task.pendingFactId = fact.id; task.state = 'awaiting_fact_confirmation';
     this._transition(session, task, task.state, 'ANSWER_SUBMITTED');
@@ -90,9 +93,26 @@ class AgentOrchestrator {
       task.candidate = { text: decision.text, contentSource: 'user_edited', verification: inspectUserEdit(decision.text, this._factsForTask(session, task)) };
       task.state = 'user_edited';
     } else task.state = decision.type;
+    if (!['accepted', 'rejected', 'skipped', 'user_edited'].includes(task.state)) throw new Error('INVALID_DECISION');
+    if (['accepted', 'user_edited'].includes(task.state)) {
+      session.handoff = { taskId, originalText: this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n'), finalText: task.candidate?.text || '', factRefs: task.candidate?.factRefs || task.factIds, contentSource: task.candidate?.contentSource || 'ai_generated', verificationStatus: task.candidate?.verification?.status || 'unavailable', riskAcknowledged: Boolean(decision.riskAcknowledged) };
+      session.state = 'ready_for_reevaluation';
+    }
     this._transition(session, task, task.state, 'USER_DECISION');
     return this.repository.save(session);
   }
+
+  async chooseReturnControl(id, taskId, action, text = '') {
+    const session = await this._get(id); const task = this._task(session, taskId);
+    if (action === 'continue') { task.state = 'questioning'; task.effectiveRounds = 0; }
+    else if (action === 'skip') task.state = 'skipped';
+    else if (action === 'manual_edit') return this.decide(id, taskId, { type: 'user_edited', text, riskAcknowledged: true });
+    else if (action === 'conservative') return this.generateCandidate(id, taskId);
+    else throw new Error('INVALID_RETURN_CONTROL_ACTION');
+    return this.repository.save(session);
+  }
+
+  async getHandoff(id) { const session = await this._get(id); return session.handoff || null; }
 
   async _get(id) { const value = await this.repository.get(id); if (!value) throw new Error('AGENT_SESSION_NOT_FOUND'); return value; }
   _task(session, id) { const task = session.tasks.find((item) => item.id === id); if (!task) throw new Error('AGENT_TASK_NOT_FOUND'); return task; }

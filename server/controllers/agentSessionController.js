@@ -22,6 +22,8 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
     async reviewFact(req, res) { try { res.json(await app.reviewFact(req.params.id, req.params.taskId, req.params.factId, req.body?.decision, req.body?.fact)); } catch (error) { fail(res, error); } },
     async generate(req, res) { try { res.json(await app.generateCandidate(req.params.id, req.params.taskId)); } catch (error) { fail(res, error); } },
     async decide(req, res) { try { res.json(await app.decide(req.params.id, req.params.taskId, req.body)); } catch (error) { fail(res, error); } },
+    async returnControl(req, res) { try { res.json(await app.chooseReturnControl(req.params.id, req.params.taskId, req.body?.action, req.body?.text)); } catch (error) { fail(res, error); } },
+    async handoff(req, res) { try { res.json(await app.getHandoff(req.params.id)); } catch (error) { fail(res, error); } },
   };
 }
 module.exports = { createAgentSessionController };
