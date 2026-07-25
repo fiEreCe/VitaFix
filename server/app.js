@@ -9,6 +9,7 @@ const resumeRoutes = require('./routes/resume');
 const supplementRoutes = require('./routes/supplement');
 const analysisRoutes = require('./routes/analysis');
 const historyRoutes = require('./routes/history');
+const agentSessionRoutes = require('./routes/agentSession');
 const userIdMiddleware = require('./middleware/userId');
 const cleanupOldData = require('./services/cleanup');
 
@@ -26,6 +27,7 @@ app.use('/api/resume', resumeRoutes);
 app.use('/api/supplement', supplementRoutes);
 app.use('/api/analysis', userIdMiddleware, analysisRoutes);
 app.use('/api/analysis', userIdMiddleware, historyRoutes);
+app.use('/api/agent-sessions', userIdMiddleware, agentSessionRoutes);
 
 // 健康检查
 app.get('/api/health', (req, res) => {

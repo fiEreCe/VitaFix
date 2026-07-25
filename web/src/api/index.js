@@ -127,6 +127,15 @@ export const analysisApi = {
   },
 }
 
+export const agentSessionApi = {
+  create(jdId, resumeId) { return request('/agent-sessions', { method: 'POST', data: { jdId, resumeId } }) },
+  get(id) { return request(`/agent-sessions/${id}`) },
+  start(id) { return request(`/agent-sessions/${id}/start`, { method: 'POST' }) },
+  selectTask(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/select`, { method: 'POST' }) },
+  generate(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/generate`, { method: 'POST' }) },
+  decide(id, taskId, decision) { return request(`/agent-sessions/${id}/tasks/${taskId}/decision`, { method: 'POST', data: decision }) },
+}
+
 // ==================== 历史记录 API ====================
 export const historyApi = {
   list(params = {}) {
