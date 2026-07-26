@@ -17,6 +17,7 @@ const schema = new mongoose.Schema({
   userId: { type: String, required: true, index: true }, jdId: { type: mongoose.Schema.Types.ObjectId, ref: 'JD' },
   resumeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Resume' }, state: { type: String, enum: SESSION_STATES, default: 'draft' },
   currentStep: String, currentTaskId: String, inputSnapshot: mongoose.Schema.Types.Mixed,
+  analysisClaimToken: String, analysisClaimExpiresAt: Date,
   requirements: [mongoose.Schema.Types.Mixed], resumeFacts: [factSchema], matches: [mongoose.Schema.Types.Mixed],
   tasks: [taskSchema], transitions: [transitionSchema], handoff: mongoose.Schema.Types.Mixed,
   expiresAt: { type: Date, default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), expires: 0 },

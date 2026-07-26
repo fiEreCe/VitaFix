@@ -9,21 +9,63 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
     create: async (value) => new AgentSession(value).save(),
     get: async (id, userId) => AgentSession.findOne({ _id: id, ...(userId ? { userId } : {}) }),
     save: async (value) => value.save(),
-    claimAnalysis: async (id, { fromStates, to, event, toolName, at }) => AgentSession.findOneAndUpdate(
-      { _id: id, state: { $in: fromStates } },
+    claimAnalysis: async (id, { fromStates, activeStates, to, event, recoveryEvent, toolName, at, token, expiresAt }) => AgentSession.findOneAndUpdate(
+      {
+        _id: id,
+        $or: [
+          { state: { $in: fromStates } },
+          {
+            state: { $in: activeStates },
+            $or: [
+              { analysisClaimExpiresAt: { $exists: false } },
+              { analysisClaimExpiresAt: null },
+              { analysisClaimExpiresAt: { $lte: new Date(at) } },
+            ],
+          },
+        ],
+      },
       [{
         $set: {
           state: to,
+          analysisClaimToken: token,
+          analysisClaimExpiresAt: expiresAt,
           transitions: {
             $concatArrays: [
               { $ifNull: ['$transitions', []] },
-              [{ from: '$state', to, event, toolName, at }],
+              [{
+                from: '$state',
+                to,
+                event: { $cond: [{ $in: ['$state', activeStates] }, recoveryEvent, event] },
+                toolName,
+                at,
+              }],
             ],
           },
         },
       }],
       { new: true },
     ),
+    async saveAnalysis(value, token, { clearClaim = false } = {}) {
+      const updated = await AgentSession.findOneAndUpdate(
+        { _id: value._id, analysisClaimToken: token },
+        {
+          $set: {
+            state: value.state,
+            currentStep: value.currentStep,
+            inputSnapshot: value.inputSnapshot,
+            requirements: value.requirements,
+            resumeFacts: value.resumeFacts,
+            matches: value.matches,
+            tasks: value.tasks,
+            transitions: value.transitions,
+          },
+          ...(clearClaim ? { $unset: { analysisClaimToken: 1, analysisClaimExpiresAt: 1 } } : {}),
+        },
+        { new: true, runValidators: true },
+      );
+      if (!updated) throw new Error('AGENT_ANALYSIS_CLAIM_LOST');
+      return updated;
+    },
   };
   const app = orchestrator || new AgentOrchestrator({ repository, tools });
   const getInputs = loadInputs || (async (jdId, resumeId) => {

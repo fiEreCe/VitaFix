@@ -10,6 +10,7 @@ const ANALYSIS_FINISHED_STATES = new Set([
   'evidence_ready', 'task_in_progress', 'ready_for_reevaluation',
   'completed', 'cancelled', 'expired',
 ]);
+const ANALYSIS_LEASE_MS = 5 * 60 * 1000;
 
 class AgentOrchestrator {
   constructor({ repository, tools }) {
@@ -28,18 +29,24 @@ class AgentOrchestrator {
   }
 
   async startAnalysis(id) {
+    const claimedAt = new Date();
     const session = await this.repository.claimAnalysis(id, {
       fromStates: [...ANALYSIS_STARTABLE_STATES],
+      activeStates: [...ANALYSIS_ACTIVE_STATES],
       to: 'parsing',
       event: 'ANALYSIS_STARTED',
+      recoveryEvent: 'ANALYSIS_RECOVERED',
       toolName: '',
-      at: new Date().toISOString(),
+      at: claimedAt.toISOString(),
+      token: crypto.randomUUID(),
+      expiresAt: new Date(claimedAt.getTime() + ANALYSIS_LEASE_MS),
     });
     if (!session) {
       const current = await this._get(id);
       if (ANALYSIS_ACTIVE_STATES.has(current.state) || ANALYSIS_FINISHED_STATES.has(current.state)) return current;
       throw new Error('AGENT_ANALYSIS_NOT_STARTABLE');
     }
+    const claimToken = session.analysisClaimToken;
     let jd;
     let resume;
     try {
@@ -48,7 +55,7 @@ class AgentOrchestrator {
       ]);
     } catch (error) {
       this._transition(session, null, 'parsing_failed', 'INPUT_PARSE_FAILED');
-      await this.repository.save(session);
+      await this.repository.saveAnalysis(session, claimToken, { clearClaim: true });
       throw error;
     }
     session.requirements = jd.requirements;
@@ -59,7 +66,7 @@ class AgentOrchestrator {
       matchResult = await this.tools.matchEvidence({ requirements: jd.requirements, facts: resume.facts });
     } catch (error) {
       this._transition(session, null, 'matching_failed', 'EVIDENCE_MATCH_FAILED');
-      await this.repository.save(session);
+      await this.repository.saveAnalysis(session, claimToken, { clearClaim: true });
       throw error;
     }
     session.matches = matchResult.matches;
@@ -70,7 +77,7 @@ class AgentOrchestrator {
     })).sort((a, b) => b.priority - a.priority);
     if (session.tasks[0]) session.tasks[0].recommended = true;
     this._transition(session, null, 'evidence_ready', 'TASKS_CREATED');
-    return this.repository.save(session);
+    return this.repository.saveAnalysis(session, claimToken, { clearClaim: true });
   }
 
   async selectTask(id, taskId) {

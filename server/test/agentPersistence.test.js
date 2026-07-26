@@ -19,15 +19,29 @@ function harness(overrides = {}) {
       store.set(value.id, structuredClone(value));
       return structuredClone(store.get(value.id));
     },
-    async claimAnalysis(id, { fromStates, to, event, toolName, at }) {
+    async claimAnalysis(id, { fromStates, activeStates = [], to, event, recoveryEvent, toolName, at, token, expiresAt }) {
       const value = store.get(id);
-      if (!value || !fromStates.includes(value.state)) return null;
+      const expired = value && (!value.analysisClaimExpiresAt || new Date(value.analysisClaimExpiresAt) <= new Date(at));
+      if (!value || (!fromStates.includes(value.state) && !(activeStates.includes(value.state) && expired))) return null;
       const claimed = structuredClone(value);
       const from = claimed.state;
       claimed.state = to;
-      claimed.transitions.push({ from, to, event, toolName, at });
+      claimed.analysisClaimToken = token;
+      claimed.analysisClaimExpiresAt = expiresAt;
+      claimed.transitions.push({ from, to, event: activeStates.includes(from) ? recoveryEvent : event, toolName, at });
       store.set(id, structuredClone(claimed));
       return structuredClone(claimed);
+    },
+    async saveAnalysis(value, token, { clearClaim = false } = {}) {
+      const stored = store.get(value.id);
+      if (!stored || stored.analysisClaimToken !== token) throw new Error('AGENT_ANALYSIS_CLAIM_LOST');
+      const saved = structuredClone(value);
+      if (clearClaim) {
+        delete saved.analysisClaimToken;
+        delete saved.analysisClaimExpiresAt;
+      }
+      store.set(value.id, structuredClone(saved));
+      return structuredClone(saved);
     },
   };
   const calls = { parseJD: 0, parseResume: 0, matchEvidence: 0 };
@@ -88,6 +102,20 @@ test('Mongoose persists task workflow fields and accepts return_control', () => 
     riskAcknowledged: true,
   });
   assert.equal(serialized.tasks[1].riskAcknowledged, false);
+});
+
+test('Mongoose persists analysis claim ownership and expiry', () => {
+  const expiresAt = new Date(Date.now() + 60_000);
+  const session = new AgentSession({
+    userId: 'user-1',
+    analysisClaimToken: 'claim-token',
+    analysisClaimExpiresAt: expiresAt,
+  });
+
+  assert.equal(session.validateSync(), undefined);
+  const serialized = session.toObject();
+  assert.equal(serialized.analysisClaimToken, 'claim-token');
+  assert.equal(serialized.analysisClaimExpiresAt.toISOString(), expiresAt.toISOString());
 });
 
 test('analysis records exact session transitions and reaches evidence_ready', async () => {
@@ -159,6 +187,87 @@ test('overlapping analysis starts atomically claim one tool run without overwrit
   ]);
 });
 
+test('a live analysis lease cannot be stolen and does not run tools', async () => {
+  const { app, repository, calls } = harness();
+  const created = await app.createSession({ userId: 'user-1', jdText: 'JD', resumeText: 'Resume' });
+  created.state = 'parsing';
+  created.analysisClaimToken = 'live-owner';
+  created.analysisClaimExpiresAt = new Date(Date.now() + 60_000);
+  created.transitions.push({ from: 'draft', to: 'parsing', event: 'ANALYSIS_STARTED', toolName: '', at: new Date().toISOString() });
+  await repository.save(created);
+
+  const active = await app.startAnalysis(created.id);
+
+  assert.equal(active.state, 'parsing');
+  assert.equal(active.analysisClaimToken, 'live-owner');
+  assert.deepEqual(calls, { parseJD: 0, parseResume: 0, matchEvidence: 0 });
+});
+
+test('expired or legacy active analysis claims can be atomically recovered', async (t) => {
+  for (const state of ['parsing', 'matching']) {
+    await t.test(state, async () => {
+      const { app, repository, calls } = harness();
+      const created = await app.createSession({ userId: 'user-1', jdText: 'JD', resumeText: 'Resume' });
+      created.state = state;
+      if (state === 'parsing') {
+        created.analysisClaimToken = 'expired-owner';
+        created.analysisClaimExpiresAt = new Date(Date.now() - 1_000);
+      }
+      created.transitions.push({ from: 'draft', to: state, event: 'INTERRUPTED_ANALYSIS', toolName: '', at: new Date().toISOString() });
+      await repository.save(created);
+
+      const ready = await app.startAnalysis(created.id);
+
+      assert.equal(ready.state, 'evidence_ready');
+      assert.equal(ready.analysisClaimToken, undefined);
+      assert.equal(ready.analysisClaimExpiresAt, undefined);
+      assert.deepEqual(calls, { parseJD: 1, parseResume: 1, matchEvidence: 1 });
+      assert.deepEqual(ready.transitions.slice(1).map(({ from, to, event }) => ({ from, to, event })), [
+        { from: state, to: 'parsing', event: 'ANALYSIS_RECOVERED' },
+        { from: 'parsing', to: 'matching', event: 'INPUT_PARSED' },
+        { from: 'matching', to: 'evidence_ready', event: 'TASKS_CREATED' },
+      ]);
+    });
+  }
+});
+
+test('an expired analysis owner cannot overwrite a newer completed claim', async () => {
+  let releaseOldOwner;
+  const oldOwnerGate = new Promise((resolve) => { releaseOldOwner = resolve; });
+  let jdCalls = 0;
+  let resumeCalls = 0;
+  const { app, repository } = harness({
+    parseJD: async () => {
+      const call = ++jdCalls;
+      if (call === 1) await oldOwnerGate;
+      return { requirements: [{ id: call === 1 ? 'req-old' : 'req-new' }] };
+    },
+    parseResume: async () => {
+      const call = ++resumeCalls;
+      if (call === 1) await oldOwnerGate;
+      return { facts: [{ id: 'fact-1', confirmation: 'confirmed' }] };
+    },
+    matchEvidence: async ({ requirements }) => ({
+      matches: [{ requirementId: requirements[0].id, factIds: ['fact-1'], gapType: 'expression', priority: 10 }],
+    }),
+  });
+  const created = await app.createSession({ userId: 'user-1', jdText: 'JD', resumeText: 'Resume' });
+  const oldStart = app.startAnalysis(created.id);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const active = await repository.get(created.id);
+  active.analysisClaimExpiresAt = new Date(Date.now() - 1_000);
+  await repository.save(active);
+  const recovered = await app.startAnalysis(created.id);
+  assert.equal(recovered.tasks[0].requirementId, 'req-new');
+
+  releaseOldOwner();
+  await assert.rejects(oldStart, /AGENT_ANALYSIS_CLAIM_LOST/);
+  const completed = await repository.get(created.id);
+  assert.equal(completed.tasks[0].requirementId, 'req-new');
+  assert.equal(completed.state, 'evidence_ready');
+});
+
 test('parse failure is persisted and retry resumes from parsing_failed', async () => {
   let attempts = 0;
   const { app } = harness({
@@ -173,6 +282,8 @@ test('parse failure is persisted and retry resumes from parsing_failed', async (
   await assert.rejects(() => app.startAnalysis(created.id), /parse unavailable/);
   const failed = await app._get(created.id);
   assert.equal(failed.state, 'parsing_failed');
+  assert.equal(failed.analysisClaimToken, undefined);
+  assert.equal(failed.analysisClaimExpiresAt, undefined);
   assert.deepEqual(failed.transitions.map(({ from, to }) => ({ from, to })), [
     { from: 'draft', to: 'parsing' },
     { from: 'parsing', to: 'parsing_failed' },
@@ -201,6 +312,8 @@ test('match failure is persisted and retry preserves inputs while completing', a
   await assert.rejects(() => app.startAnalysis(created.id), /match unavailable/);
   const failed = await app._get(created.id);
   assert.equal(failed.state, 'matching_failed');
+  assert.equal(failed.analysisClaimToken, undefined);
+  assert.equal(failed.analysisClaimExpiresAt, undefined);
   assert.equal(failed.inputSnapshot.jdText, 'JD');
   assert.equal(failed.inputSnapshot.resumeText, 'Resume');
   assert.deepEqual(failed.transitions.map(({ from, to }) => ({ from, to })), [
