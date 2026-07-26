@@ -11,11 +11,20 @@ const ANALYSIS_FINISHED_STATES = new Set([
   'completed', 'cancelled', 'expired',
 ]);
 const ANALYSIS_LEASE_MS = 5 * 60 * 1000;
+const DEFAULT_SCHEDULER = {
+  setInterval: (callback, milliseconds) => setInterval(callback, milliseconds),
+  clearInterval: (timer) => clearInterval(timer),
+};
 
 class AgentOrchestrator {
-  constructor({ repository, tools }) {
+  constructor(options) {
+    const { repository, tools } = options;
     this.repository = repository;
     this.tools = tools;
+    this.analysisLeaseMs = options.analysisLeaseMs ?? ANALYSIS_LEASE_MS;
+    this.analysisHeartbeatMs = options.analysisHeartbeatMs ?? Math.floor(this.analysisLeaseMs / 3);
+    this.clock = options.clock || (() => new Date());
+    this.scheduler = options.scheduler || DEFAULT_SCHEDULER;
   }
 
   async createSession({ userId, jdText, resumeText, jdId = null, resumeId = null }) {
@@ -29,7 +38,7 @@ class AgentOrchestrator {
   }
 
   async startAnalysis(id) {
-    const claimedAt = new Date();
+    const claimedAt = this.clock();
     const session = await this.repository.claimAnalysis(id, {
       fromStates: [...ANALYSIS_STARTABLE_STATES],
       activeStates: [...ANALYSIS_ACTIVE_STATES],
@@ -39,7 +48,7 @@ class AgentOrchestrator {
       toolName: '',
       at: claimedAt.toISOString(),
       token: crypto.randomUUID(),
-      expiresAt: new Date(claimedAt.getTime() + ANALYSIS_LEASE_MS),
+      expiresAt: new Date(claimedAt.getTime() + this.analysisLeaseMs),
     });
     if (!session) {
       const current = await this._get(id);
@@ -47,37 +56,47 @@ class AgentOrchestrator {
       throw new Error('AGENT_ANALYSIS_NOT_STARTABLE');
     }
     const claimToken = session.analysisClaimToken;
-    let jd;
-    let resume;
+    const heartbeat = this._startAnalysisHeartbeat(id, claimToken);
     try {
-      [jd, resume] = await Promise.all([
-        this.tools.parseJD(session.inputSnapshot.jdText), this.tools.parseResume(session.inputSnapshot.resumeText),
-      ]);
-    } catch (error) {
-      this._transition(session, null, 'parsing_failed', 'INPUT_PARSE_FAILED');
-      await this.repository.saveAnalysis(session, claimToken, { clearClaim: true });
-      throw error;
+      await heartbeat.assertOwned();
+      let jd;
+      let resume;
+      try {
+        [jd, resume] = await Promise.all([
+          this.tools.parseJD(session.inputSnapshot.jdText), this.tools.parseResume(session.inputSnapshot.resumeText),
+        ]);
+      } catch (error) {
+        this._transition(session, null, 'parsing_failed', 'INPUT_PARSE_FAILED');
+        await heartbeat.assertOwned(true);
+        await this.repository.saveAnalysis(session, claimToken, { clearClaim: true });
+        throw error;
+      }
+      session.requirements = jd.requirements;
+      session.resumeFacts = resume.facts;
+      await heartbeat.assertOwned(true);
+      this._transition(session, null, 'matching', 'INPUT_PARSED');
+      let matchResult;
+      try {
+        matchResult = await this.tools.matchEvidence({ requirements: jd.requirements, facts: resume.facts });
+      } catch (error) {
+        this._transition(session, null, 'matching_failed', 'EVIDENCE_MATCH_FAILED');
+        await heartbeat.assertOwned(true);
+        await this.repository.saveAnalysis(session, claimToken, { clearClaim: true });
+        throw error;
+      }
+      session.matches = matchResult.matches;
+      session.tasks = matchResult.matches.map((match, index) => ({
+        id: `task-${index + 1}`, requirementId: match.requirementId, factIds: match.factIds || [],
+        gapType: match.gapType, priority: match.priority || 0, state: 'pending', effectiveRounds: 0,
+        clarificationUsed: false, confirmedFacts: [], candidate: null, recommended: false,
+      })).sort((a, b) => b.priority - a.priority);
+      if (session.tasks[0]) session.tasks[0].recommended = true;
+      this._transition(session, null, 'evidence_ready', 'TASKS_CREATED');
+      await heartbeat.assertOwned(true);
+      return this.repository.saveAnalysis(session, claimToken, { clearClaim: true });
+    } finally {
+      await heartbeat.stop();
     }
-    session.requirements = jd.requirements;
-    session.resumeFacts = resume.facts;
-    this._transition(session, null, 'matching', 'INPUT_PARSED');
-    let matchResult;
-    try {
-      matchResult = await this.tools.matchEvidence({ requirements: jd.requirements, facts: resume.facts });
-    } catch (error) {
-      this._transition(session, null, 'matching_failed', 'EVIDENCE_MATCH_FAILED');
-      await this.repository.saveAnalysis(session, claimToken, { clearClaim: true });
-      throw error;
-    }
-    session.matches = matchResult.matches;
-    session.tasks = matchResult.matches.map((match, index) => ({
-      id: `task-${index + 1}`, requirementId: match.requirementId, factIds: match.factIds || [],
-      gapType: match.gapType, priority: match.priority || 0, state: 'pending', effectiveRounds: 0,
-      clarificationUsed: false, confirmedFacts: [], candidate: null, recommended: false,
-    })).sort((a, b) => b.priority - a.priority);
-    if (session.tasks[0]) session.tasks[0].recommended = true;
-    this._transition(session, null, 'evidence_ready', 'TASKS_CREATED');
-    return this.repository.saveAnalysis(session, claimToken, { clearClaim: true });
   }
 
   async selectTask(id, taskId) {
@@ -226,6 +245,34 @@ class AgentOrchestrator {
   async _get(id) { const value = await this.repository.get(id); if (!value) throw new Error('AGENT_SESSION_NOT_FOUND'); return value; }
   _task(session, id) { const task = session.tasks.find((item) => item.id === id); if (!task) throw new Error('AGENT_TASK_NOT_FOUND'); return task; }
   _factsForTask(session, task) { return session.resumeFacts.filter((fact) => task.factIds.includes(fact.id)); }
+  _startAnalysisHeartbeat(id, token) {
+    let stopped = false;
+    let claimLost = false;
+    let renewal = null;
+    const renew = () => {
+      if (stopped || claimLost || renewal) return renewal || Promise.resolve();
+      const expiresAt = new Date(this.clock().getTime() + this.analysisLeaseMs);
+      renewal = Promise.resolve()
+        .then(() => this.repository.renewAnalysisClaim(id, token, expiresAt))
+        .then((value) => { if (!value) claimLost = true; })
+        .catch(() => { claimLost = true; })
+        .finally(() => { renewal = null; });
+      return renewal;
+    };
+    const timer = this.scheduler.setInterval(() => { void renew(); }, this.analysisHeartbeatMs);
+    return {
+      assertOwned: async (renewNow = false) => {
+        if (renewNow) await renew();
+        else if (renewal) await renewal;
+        if (claimLost) throw new Error('AGENT_ANALYSIS_CLAIM_LOST');
+      },
+      stop: async () => {
+        stopped = true;
+        this.scheduler.clearInterval(timer);
+        if (renewal) await renewal;
+      },
+    };
+  }
   _transition(session, task, to, event, toolName = '') {
     const target = task || session;
     const from = target.state;

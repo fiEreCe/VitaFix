@@ -66,6 +66,11 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
       if (!updated) throw new Error('AGENT_ANALYSIS_CLAIM_LOST');
       return updated;
     },
+    renewAnalysisClaim: async (id, token, expiresAt) => AgentSession.findOneAndUpdate(
+      { _id: id, analysisClaimToken: token },
+      { $set: { analysisClaimExpiresAt: expiresAt } },
+      { new: true },
+    ),
   };
   const app = orchestrator || new AgentOrchestrator({ repository, tools });
   const getInputs = loadInputs || (async (jdId, resumeId) => {

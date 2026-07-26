@@ -4,8 +4,37 @@ const assert = require('node:assert/strict');
 const AgentSession = require('../models/AgentSession');
 const { AgentOrchestrator } = require('../services/agent/agentOrchestrator');
 
-function harness(overrides = {}) {
+function manualTime() {
+  let current = Date.now();
+  const timers = new Set();
+  return {
+    clock: () => new Date(current),
+    scheduler: {
+      setInterval(callback) {
+        const timer = { callback, active: true };
+        timers.add(timer);
+        return timer;
+      },
+      clearInterval(timer) {
+        timer.active = false;
+        timers.delete(timer);
+      },
+    },
+    advance(milliseconds) { current += milliseconds; },
+    async heartbeat() {
+      [...timers].filter((timer) => timer.active).forEach((timer) => timer.callback());
+      await new Promise((resolve) => setImmediate(resolve));
+    },
+    stop() {
+      timers.forEach((timer) => { timer.active = false; });
+      timers.clear();
+    },
+  };
+}
+
+function harness(overrides = {}, orchestratorOptions = {}) {
   const store = new Map();
+  const claimCalls = { renew: 0 };
   const repository = {
     async create(value) {
       store.set(value.id, structuredClone(value));
@@ -43,6 +72,14 @@ function harness(overrides = {}) {
       store.set(value.id, structuredClone(saved));
       return structuredClone(saved);
     },
+    async renewAnalysisClaim(id, token, expiresAt) {
+      claimCalls.renew += 1;
+      const stored = store.get(id);
+      if (!stored || stored.analysisClaimToken !== token) return null;
+      stored.analysisClaimExpiresAt = expiresAt;
+      store.set(id, structuredClone(stored));
+      return structuredClone(stored);
+    },
   };
   const calls = { parseJD: 0, parseResume: 0, matchEvidence: 0 };
   const tools = {
@@ -60,7 +97,7 @@ function harness(overrides = {}) {
     },
     ...overrides,
   };
-  return { app: new AgentOrchestrator({ repository, tools }), repository, calls };
+  return { app: new AgentOrchestrator({ repository, tools, ...orchestratorOptions }), repository, calls, claimCalls };
 }
 
 test('Mongoose persists task workflow fields and accepts return_control', () => {
@@ -266,6 +303,113 @@ test('an expired analysis owner cannot overwrite a newer completed claim', async
   const completed = await repository.get(created.id);
   assert.equal(completed.tasks[0].requirementId, 'req-new');
   assert.equal(completed.state, 'evidence_ready');
+});
+
+test('heartbeat renewal keeps an unresolved live analysis from being stolen', async () => {
+  const time = manualTime();
+  let releaseParsing;
+  const parsingGate = new Promise((resolve) => { releaseParsing = resolve; });
+  const calls = { parseJD: 0, parseResume: 0 };
+  const { app, claimCalls } = harness({
+    parseJD: async () => { calls.parseJD += 1; await parsingGate; return { requirements: [{ id: 'req-1' }] }; },
+    parseResume: async () => { calls.parseResume += 1; await parsingGate; return { facts: [{ id: 'fact-1', confirmation: 'confirmed' }] }; },
+  }, {
+    analysisLeaseMs: 100,
+    analysisHeartbeatMs: 20,
+    clock: time.clock,
+    scheduler: time.scheduler,
+  });
+  const created = await app.createSession({ userId: 'user-1', jdText: 'JD', resumeText: 'Resume' });
+
+  const first = app.startAnalysis(created.id);
+  await new Promise((resolve) => setImmediate(resolve));
+  time.advance(150);
+  await time.heartbeat();
+  const overlapping = await app.startAnalysis(created.id);
+
+  assert.equal(overlapping.state, 'parsing');
+  assert.deepEqual(calls, { parseJD: 1, parseResume: 1 });
+  assert.equal(claimCalls.renew, 1);
+  releaseParsing();
+  const completed = await first;
+  assert.equal(completed.state, 'evidence_ready');
+});
+
+test('stopped heartbeat allows an expired analysis to be recovered', async () => {
+  const time = manualTime();
+  let releaseOldOwner;
+  const oldOwnerGate = new Promise((resolve) => { releaseOldOwner = resolve; });
+  let jdCalls = 0;
+  const { app } = harness({
+    parseJD: async () => {
+      const call = ++jdCalls;
+      if (call === 1) await oldOwnerGate;
+      return { requirements: [{ id: call === 1 ? 'req-old' : 'req-new' }] };
+    },
+    parseResume: async () => ({ facts: [{ id: 'fact-1', confirmation: 'confirmed' }] }),
+    matchEvidence: async ({ requirements }) => ({
+      matches: [{ requirementId: requirements[0].id, factIds: ['fact-1'], gapType: 'expression', priority: 10 }],
+    }),
+  }, {
+    analysisLeaseMs: 100,
+    analysisHeartbeatMs: 20,
+    clock: time.clock,
+    scheduler: time.scheduler,
+  });
+  const created = await app.createSession({ userId: 'user-1', jdText: 'JD', resumeText: 'Resume' });
+  const oldStart = app.startAnalysis(created.id);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  time.stop();
+  time.advance(150);
+  const recovered = await app.startAnalysis(created.id);
+
+  assert.equal(recovered.tasks[0].requirementId, 'req-new');
+  releaseOldOwner();
+  await assert.rejects(oldStart, /AGENT_ANALYSIS_CLAIM_LOST/);
+});
+
+test('lost heartbeat ownership prevents the old worker from launching matching or saving', async () => {
+  const time = manualTime();
+  let releaseParsing;
+  const parsingGate = new Promise((resolve) => { releaseParsing = resolve; });
+  let matchCalls = 0;
+  const { app, repository } = harness({
+    parseJD: async () => { await parsingGate; return { requirements: [{ id: 'req-old' }] }; },
+    parseResume: async () => { await parsingGate; return { facts: [{ id: 'fact-1', confirmation: 'confirmed' }] }; },
+    matchEvidence: async () => { matchCalls += 1; return { matches: [] }; },
+  }, {
+    analysisLeaseMs: 100,
+    analysisHeartbeatMs: 20,
+    clock: time.clock,
+    scheduler: time.scheduler,
+  });
+  const created = await app.createSession({ userId: 'user-1', jdText: 'JD', resumeText: 'Resume' });
+  const oldStart = app.startAnalysis(created.id);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const oldClaim = await repository.get(created.id);
+  time.advance(150);
+  const newerClaim = await repository.claimAnalysis(created.id, {
+    fromStates: ['draft', 'parsing_failed', 'matching_failed'],
+    activeStates: ['parsing', 'matching'],
+    to: 'parsing',
+    event: 'ANALYSIS_STARTED',
+    recoveryEvent: 'ANALYSIS_RECOVERED',
+    toolName: '',
+    at: time.clock().toISOString(),
+    token: 'new-owner',
+    expiresAt: new Date(time.clock().getTime() + 100),
+  });
+  assert.notEqual(newerClaim.analysisClaimToken, oldClaim.analysisClaimToken);
+  await time.heartbeat();
+  releaseParsing();
+
+  await assert.rejects(oldStart, /AGENT_ANALYSIS_CLAIM_LOST/);
+  assert.equal(matchCalls, 0);
+  const stored = await repository.get(created.id);
+  assert.equal(stored.analysisClaimToken, 'new-owner');
+  assert.equal(stored.state, 'parsing');
 });
 
 test('parse failure is persisted and retry resumes from parsing_failed', async () => {
