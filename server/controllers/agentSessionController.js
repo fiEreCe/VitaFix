@@ -13,13 +13,13 @@ async function loadOwnedInputs(jdId, resumeId, userId) {
   return { jdText: jd.rawText, resumeText: resume.rawText };
 }
 
-function createAgentSessionController({ orchestrator, loadInputs } = {}) {
+function createAgentSessionRepository() {
   const persistedFields = [
     'state', 'currentStep', 'currentTaskId', 'inputSnapshot', 'requirements',
     'resumeFacts', 'matches', 'tasks', 'transitions', 'handoff',
   ];
   const persistedChanges = (value) => Object.fromEntries(persistedFields.map((key) => [key, value[key]]));
-  const repository = {
+  return {
     create: async (value) => new AgentSession(value).save(),
     get: async (id, userId) => AgentSession.findOne({ _id: id, userId }),
     save: async (value, userId) => AgentSession.findOneAndUpdate(
@@ -91,9 +91,22 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
       { new: true },
     ),
   };
+}
+
+function createAgentSessionController({ orchestrator, loadInputs } = {}) {
+  const repository = createAgentSessionRepository();
   const app = orchestrator || new AgentOrchestrator({ repository, tools });
   const getInputs = loadInputs || loadOwnedInputs;
-  const fail = (res, error) => res.status(error.message === 'AGENT_SESSION_NOT_FOUND' ? 404 : 400).json({ error: { code: error.message, message: '操作未完成，请检查输入后重试', retryable: true } });
+  const fail = (res, error) => {
+    const notFound = ['AGENT_SESSION_NOT_FOUND', 'INPUT_NOT_FOUND'].includes(error.message);
+    return res.status(notFound ? 404 : 400).json({
+      error: {
+        code: error.message,
+        message: '操作未完成，请检查输入后重试',
+        retryable: !notFound,
+      },
+    });
+  };
   const ensureOwned = async (req) => { if (!await repository.get(req.params.id, req.userId)) throw new Error('AGENT_SESSION_NOT_FOUND'); };
   const command = (fn) => async (req, res) => { try { await ensureOwned(req); res.json(await fn(req)); } catch (error) { fail(res, error); } };
 
@@ -114,5 +127,5 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
   };
 }
 
-module.exports = { createAgentSessionController, loadOwnedInputs };
+module.exports = { createAgentSessionController, createAgentSessionRepository, loadOwnedInputs };
 module.exports.default = createAgentSessionController();
