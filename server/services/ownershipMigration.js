@@ -66,6 +66,12 @@ function record(result, classification, id) {
   }
 }
 
+function classifyFailedOwnershipWrite(current, provenOwner) {
+  if (!current.found) return 'unchanged';
+  if (current.userId && String(current.userId) === provenOwner) return 'unchanged';
+  return 'conflict';
+}
+
 async function migrateResources(repository, proofs, dryRun) {
   const result = emptyResult();
   const resources = repository.scan({
@@ -103,10 +109,10 @@ async function migrateResources(repository, proofs, dryRun) {
       );
     } catch (error) {
       if (error?.code !== 11000) throw error;
-      await repository.findById(resource._id, {
+      const current = await repository.findById(resource._id, {
         projection: '_id userId resumeId',
       });
-      record(result, 'conflict', id);
+      record(result, classifyFailedOwnershipWrite(current, provenOwner), id);
       continue;
     }
     if (write.modifiedCount === 1) {
@@ -117,9 +123,7 @@ async function migrateResources(repository, proofs, dryRun) {
     const current = await repository.findById(resource._id, {
       projection: '_id userId resumeId',
     });
-    if (!current.found) record(result, 'unchanged', id);
-    else if (current.userId && String(current.userId) === provenOwner) record(result, 'unchanged', id);
-    else record(result, 'conflict', id);
+    record(result, classifyFailedOwnershipWrite(current, provenOwner), id);
   }
 
   result.updatedIds.sort();

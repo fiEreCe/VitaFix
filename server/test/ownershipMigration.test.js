@@ -182,6 +182,46 @@ test('duplicate Supplement owner-resume index collision is a conflict and later 
   }]);
 });
 
+test('E11000 reread with the proven owner is unchanged rather than conflicted', async () => {
+  const repos = {
+    analyses: collection([{ _id: 'a1', userId: 'u1', supplementId: 'supp1' }]),
+    agentSessions: collection([]),
+    jds: collection([]),
+    resumes: collection([]),
+    supplements: collection([{ _id: 'supp1', resumeId: 'resume1' }]),
+  };
+  repos.supplements.updateOne = async () => {
+    repos.supplements.rows[0].userId = 'u1';
+    const error = new Error('duplicate');
+    error.code = 11000;
+    throw error;
+  };
+  const summary = await runOwnershipMigration(repos, { dryRun: false });
+  assert.equal(summary.supplement.unchanged, 1);
+  assert.equal(summary.supplement.conflicts, 0);
+  assert.deepEqual(summary.supplement.conflictIds, []);
+});
+
+test('E11000 reread of a missing resource is unchanged rather than conflicted', async () => {
+  const repos = {
+    analyses: collection([{ _id: 'a1', userId: 'u1', supplementId: 'supp1' }]),
+    agentSessions: collection([]),
+    jds: collection([]),
+    resumes: collection([]),
+    supplements: collection([{ _id: 'supp1', resumeId: 'resume1' }]),
+  };
+  repos.supplements.updateOne = async () => {
+    repos.supplements.rows.splice(0, 1);
+    const error = new Error('duplicate');
+    error.code = 11000;
+    throw error;
+  };
+  const summary = await runOwnershipMigration(repos, { dryRun: false });
+  assert.equal(summary.supplement.unchanged, 1);
+  assert.equal(summary.supplement.conflicts, 0);
+  assert.deepEqual(summary.supplement.conflictIds, []);
+});
+
 test('non-duplicate migration write failures are not reclassified as ownership conflicts', async () => {
   const repos = {
     analyses: collection([{ _id: 'a1', userId: 'u1', supplementId: 'supp1' }]),
