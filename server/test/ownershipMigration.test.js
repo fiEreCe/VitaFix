@@ -14,6 +14,7 @@ function collection(rows) {
     rows: rows.map((row) => ({ ...row })),
     updates: [],
     scans: [],
+    reads: [],
     async *scan(options) {
       this.scans.push(options);
       const keys = options.projection.split(/\s+/);
@@ -21,9 +22,10 @@ function collection(rows) {
         yield Object.fromEntries(keys.filter((key) => key in row).map((key) => [key, row[key]]));
       }
     },
-    async findOwnerById(id) {
+    async findById(id, options) {
+      this.reads.push({ id, ...options });
       const row = this.rows.find((item) => item._id === id);
-      return row ? { found: true, userId: row.userId } : { found: false };
+      return row ? { found: true, ...row } : { found: false };
     },
     async updateOne(filter, update) {
       this.updates.push({ filter, update });
@@ -140,6 +142,64 @@ test('concurrent assignment to the proven owner is re-read as unchanged', async 
   assert.equal(summary.jd.updated, 0);
   assert.equal(summary.jd.unchanged, 1);
   assert.deepEqual(summary.jd.conflictIds, []);
+});
+
+test('duplicate Supplement owner-resume index collision is a conflict and later resources still migrate', async () => {
+  const repos = {
+    analyses: collection([
+      { _id: 'a1', userId: 'u1', supplementId: 'supp-collision' },
+      { _id: 'a2', userId: 'u2', supplementId: 'supp-independent' },
+    ]),
+    agentSessions: collection([]),
+    jds: collection([]),
+    resumes: collection([]),
+    supplements: collection([
+      { _id: 'supp-collision', resumeId: 'resume-1' },
+      { _id: 'supp-existing', userId: 'u1', resumeId: 'resume-1' },
+      { _id: 'supp-independent', resumeId: 'resume-2' },
+    ]),
+  };
+  const baseUpdate = repos.supplements.updateOne.bind(repos.supplements);
+  repos.supplements.updateOne = async (filter, update) => {
+    if (filter._id === 'supp-collision') {
+      const error = new Error('duplicate owner-resume');
+      error.code = 11000;
+      throw error;
+    }
+    return baseUpdate(filter, update);
+  };
+
+  const summary = await runOwnershipMigration(repos, { dryRun: false });
+  assert.equal(repos.supplements.rows.find((row) => row._id === 'supp-collision').userId, undefined);
+  assert.equal(repos.supplements.rows.find((row) => row._id === 'supp-independent').userId, 'u2');
+  assert.equal(summary.supplement.updated, 1);
+  assert.deepEqual(summary.supplement.updatedIds, ['supp-independent']);
+  assert.equal(summary.supplement.conflicts, 1);
+  assert.deepEqual(summary.supplement.conflictIds, ['supp-collision']);
+  assert.deepEqual(repos.supplements.reads, [{
+    id: 'supp-collision',
+    projection: '_id userId resumeId',
+  }]);
+});
+
+test('non-duplicate migration write failures are not reclassified as ownership conflicts', async () => {
+  const repos = {
+    analyses: collection([{ _id: 'a1', userId: 'u1', supplementId: 'supp1' }]),
+    agentSessions: collection([]),
+    jds: collection([]),
+    resumes: collection([]),
+    supplements: collection([{ _id: 'supp1', resumeId: 'resume1' }]),
+  };
+  repos.supplements.updateOne = async () => {
+    const error = new Error('database unavailable');
+    error.code = 91;
+    throw error;
+  };
+  await assert.rejects(
+    () => runOwnershipMigration(repos, { dryRun: false }),
+    /database unavailable/,
+  );
+  assert.deepEqual(repos.supplements.reads, []);
 });
 
 test('migration scans sorted projections only and never requests raw payload fields', async () => {
