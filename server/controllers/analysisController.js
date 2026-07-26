@@ -21,8 +21,8 @@ exports.create = async (req, res) => {
 
     // 获取JD和简历
     const [jd, resume] = await Promise.all([
-      JD.findById(jdId),
-      Resume.findById(resumeId),
+      JD.findOne({ _id: jdId, userId: req.userId }),
+      Resume.findOne({ _id: resumeId, userId: req.userId }),
     ]);
 
     if (!jd) return res.status(404).json({ error: 'JD不存在' });
@@ -39,9 +39,10 @@ exports.create = async (req, res) => {
     await analysis.save();
 
     // 获取补充信息
-    const supplement = await Supplement.findOne({ resumeId });
+    const supplement = await Supplement.findOne({ resumeId, userId: req.userId });
 
     // 异步执行AI分析
+    const ownerId = req.userId;
     setImmediate(async () => {
       const startTime = Date.now();
       try {
@@ -51,15 +52,34 @@ exports.create = async (req, res) => {
           supplement?.items || []
         );
 
-        analysis.analysis = result;
-        analysis.status = 'completed';
-        await analysis.save();
+        const write = await Analysis.updateOne(
+          { _id: analysis._id, userId: ownerId },
+          {
+            $set: {
+              analysis: result,
+              status: 'completed',
+              errorMessage: '',
+              updatedAt: new Date(),
+            },
+          },
+          { runValidators: true },
+        );
+        if (write.matchedCount === 0) return;
         const elapsed = Math.round((Date.now() - startTime) / 1000);
         console.log(`[分析] 完成 ${analysis._id}，耗时 ${elapsed}s，分数 ${result.overallScore}`);
       } catch (error) {
-        analysis.status = 'failed';
-        analysis.errorMessage = error.message;
-        await analysis.save();
+        const write = await Analysis.updateOne(
+          { _id: analysis._id, userId: ownerId },
+          {
+            $set: {
+              status: 'failed',
+              errorMessage: error.message,
+              updatedAt: new Date(),
+            },
+          },
+          { runValidators: true },
+        );
+        if (write.matchedCount === 0) return;
         console.error(`[分析] 失败 ${analysis._id}: ${error.message}`);
       }
     });
@@ -82,9 +102,9 @@ exports.create = async (req, res) => {
  */
 exports.getById = async (req, res) => {
   try {
-    const analysis = await Analysis.findById(req.params.id)
-      .populate('jdId', 'rawText parsed')
-      .populate('resumeId', 'rawText parsed');
+    const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.userId })
+      .populate({ path: 'jdId', select: 'rawText parsed', match: { userId: req.userId } })
+      .populate({ path: 'resumeId', select: 'rawText parsed', match: { userId: req.userId } });
 
     if (!analysis) {
       return res.status(404).json({ error: '分析记录不存在' });
@@ -101,7 +121,7 @@ exports.getById = async (req, res) => {
  */
 exports.getStatus = async (req, res) => {
   try {
-    const analysis = await Analysis.findById(req.params.id, 'status errorMessage');
+    const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.userId }, 'status errorMessage');
     if (!analysis) {
       return res.status(404).json({ error: '分析记录不存在' });
     }
@@ -121,10 +141,10 @@ exports.reevaluateSection = async (req, res) => {
       return res.status(400).json({ error: 'sectionType、sectionIndex、revisedText 不能为空' });
     }
 
-    const analysis = await Analysis.findById(req.params.id)
-      .populate('jdId', 'parsed');
+    const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.userId })
+      .populate({ path: 'jdId', select: 'parsed', match: { userId: req.userId } });
 
-    if (!analysis) {
+    if (!analysis || !analysis.jdId) {
       return res.status(404).json({ error: '分析记录不存在' });
     }
 
@@ -154,9 +174,21 @@ exports.reevaluateSection = async (req, res) => {
     originalSection['垂直差距'] = updated['垂直差距'];
     originalSection.suggestions = updated.suggestions;
 
-    // 保存整个文档
+    // 以当前所有者为条件保存整个板块，避免读取后所有权变化导致越权写入
     analysis.markModified('analysis.sectionAnalysis');
-    await analysis.save();
+    const write = await Analysis.updateOne(
+      { _id: analysis._id, userId: req.userId },
+      {
+        $set: {
+          'analysis.sectionAnalysis': analysis.analysis.sectionAnalysis,
+          updatedAt: new Date(),
+        },
+      },
+      { runValidators: true },
+    );
+    if (write.matchedCount === 0) {
+      return res.status(404).json({ error: '分析记录不存在' });
+    }
 
     res.json({
       matchScore: updated.matchScore,

@@ -8,9 +8,9 @@ reviewers:
   - AI 负责人
   - 测试负责人
 status: draft
-version: "0.9"
+version: "1.0"
 created_at: 2026-07-23
-updated_at: 2026-07-24
+updated_at: 2026-07-27
 ---
 
 # 精投助手产品文档中心
@@ -54,6 +54,7 @@ updated_at: 2026-07-24
 | [08-analytics-and-metrics.md](./08-analytics-and-metrics.md) | 指标口径、漏斗和埋点事件 | 已形成需求草案 |
 | [09-mvp-acceptance.md](./09-mvp-acceptance.md) | 端到端验收、AI 门槛和上线阻断条件 | 已形成需求草案 |
 | [10-v0.1-development-readiness-and-execution-plan.md](./10-v0.1-development-readiness-and-execution-plan.md) | 开发准入、技术前置、实施顺序和阶段退出条件 | 已批准执行基线 |
+| [11-development-handoff-2026-07-27.md](./11-development-handoff-2026-07-27.md) | 当前分支、已完成修复、未完成工作、风险和接手命令 | 当前开发交接基线 |
 
 ## 4. 模块规格
 
@@ -111,3 +112,18 @@ updated_at: 2026-07-24
 - AI 质量指标的数值门槛，需要先完成 12 个端到端黄金案例和 30 个原子安全案例的基线评测。
 
 已确认：V0.1 求职作品版是首个实现版本；账号、免费账号 30 天保留以及证据库导入导出进入后续产品 MVP。完整决策见 [版本规范与路线图](./00-version-specification-and-roadmap.md)。
+
+## 9. 当前工程进度（2026-07-27）
+
+| 工作项 | 状态 | 当前结论 |
+|---|---|---|
+| Agent 状态持久化、并发启动和失败恢复 | `verified_in_code` | 原子 claim、租约、心跳和旧 worker fencing 已完成，自动测试通过 |
+| JD、Resume、Supplement、Analysis、AgentSession 所有权 | `verified_in_code` | 接口、异步写回、cleanup 和迁移维护路径已完成，自动测试通过 |
+| 旧数据所有权迁移 | `implemented_not_run` | dry-run/正式迁移代码已完成，尚未在真实 MongoDB 执行 |
+| PF-001 中文匹配和动态追问 | `in_progress` | 原实现存在漏匹配和事实无法累积问题，修复尚未落地 |
+| PF-002 独立事实审核 | `in_progress` | 已有确定性规则和案例，但无关主张与跨用途数字仍可能误放行 |
+| PF-003 修改效果验证和 handoff | `in_progress` | 已有基本记录和风险状态，语义判断与最终交接仍未闭环 |
+| PF-004 预计算演示 | `in_progress` | 已有入口和 fixture，真实契约兼容与指标隔离仍待完成 |
+| V0.1 求职验收 | `blocked` | PF-001 至 PF-004 尚未全部 verified |
+
+具体代码状态、提交、未完成项和接手命令见 [开发交接文档](./11-development-handoff-2026-07-27.md)。

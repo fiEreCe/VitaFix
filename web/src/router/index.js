@@ -32,6 +32,12 @@ const routes = [
     name: 'History',
     component: () => import('../views/History.vue'),
   },
+  {
+    path: '/agent/:id',
+    name: 'AgentWorkbench',
+    component: () => import('../views/AgentWorkbench.vue'),
+  },
+  { path: '/demo', name: 'GuidedDemo', component: () => import('../views/GuidedDemo.vue') },
 ]
 
 const router = createRouter({

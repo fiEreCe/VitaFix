@@ -100,7 +100,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
-import { supplementApi, analysisApi } from '../api'
+import { supplementApi, agentSessionApi } from '../api'
 import { events } from '../utils/analytics'
 
 const route = useRoute()
@@ -172,13 +172,14 @@ async function saveAndAnalyze() {
 
 async function startAnalysis() {
   try {
-    const res = await analysisApi.create(jdId.value, resumeId.value)
+    const res = await agentSessionApi.create(jdId.value, resumeId.value)
+    await agentSessionApi.start(res.id)
     events.analysisStarted()
     // 清理 localStorage 中的暂存数据
     localStorage.removeItem('pendingResumeId')
     localStorage.removeItem('pendingJdId')
     showToast('分析已启动')
-    router.replace(`/result/${res.id}`)
+    router.replace(`/agent/${res.id}`)
   } catch (e) {
     showToast('启动分析失败: ' + e.message)
   }

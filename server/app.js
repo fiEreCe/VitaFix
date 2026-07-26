@@ -9,6 +9,7 @@ const resumeRoutes = require('./routes/resume');
 const supplementRoutes = require('./routes/supplement');
 const analysisRoutes = require('./routes/analysis');
 const historyRoutes = require('./routes/history');
+const agentSessionRoutes = require('./routes/agentSession');
 const userIdMiddleware = require('./middleware/userId');
 const cleanupOldData = require('./services/cleanup');
 
@@ -21,11 +22,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 路由（需要用户隔离的接口挂载 userId 中间件）
-app.use('/api/jd', jdRoutes);
-app.use('/api/resume', resumeRoutes);
-app.use('/api/supplement', supplementRoutes);
+app.use('/api/jd', userIdMiddleware, jdRoutes);
+app.use('/api/resume', userIdMiddleware, resumeRoutes);
+app.use('/api/supplement', userIdMiddleware, supplementRoutes);
 app.use('/api/analysis', userIdMiddleware, analysisRoutes);
 app.use('/api/analysis', userIdMiddleware, historyRoutes);
+app.use('/api/agent-sessions', userIdMiddleware, agentSessionRoutes);
 
 // 健康检查
 app.get('/api/health', (req, res) => {

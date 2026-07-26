@@ -127,6 +127,22 @@ export const analysisApi = {
   },
 }
 
+export const agentSessionApi = {
+  create(jdId, resumeId) { return request('/agent-sessions', { method: 'POST', data: { jdId, resumeId } }) },
+  get(id) { return request(`/agent-sessions/${id}`) },
+  start(id) { return request(`/agent-sessions/${id}/start`, { method: 'POST' }) },
+  selectTask(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/select`, { method: 'POST' }) },
+  answer(id, taskId, answer) { return request(`/agent-sessions/${id}/tasks/${taskId}/answers`, { method: 'POST', data: { answer } }) },
+  reviewFact(id, taskId, factId, decision, fact) { return request(`/agent-sessions/${id}/tasks/${taskId}/facts/${factId}`, { method: 'PATCH', data: { decision, fact } }) },
+  generate(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/generate`, { method: 'POST' }) },
+  retry(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/retry`, { method: 'POST' }) },
+  validate(id, taskId, text) { return request(`/agent-sessions/${id}/tasks/${taskId}/validate`, { method: 'POST', data: { text } }) },
+  completeWithRisk(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/complete-with-risk`, { method: 'POST' }) },
+  decide(id, taskId, decision) { return request(`/agent-sessions/${id}/tasks/${taskId}/decision`, { method: 'POST', data: decision }) },
+  returnControl(id, taskId, action, text = '') { return request(`/agent-sessions/${id}/tasks/${taskId}/return-control`, { method: 'POST', data: { action, text } }) },
+  handoff(id) { return request(`/agent-sessions/${id}/handoff`) },
+}
+
 // ==================== 历史记录 API ====================
 export const historyApi = {
   list(params = {}) {

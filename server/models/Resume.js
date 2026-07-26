@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const resumeSchema = new mongoose.Schema({
+  userId: { type: String, index: true },
   rawText: { type: String, required: true },
   parsed: {
     // 个人信息（可选）

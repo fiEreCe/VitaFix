@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const jdSchema = new mongoose.Schema({
+  userId: { type: String, index: true },
   rawText: { type: String, required: true },
   parsed: {
     company: { type: String, default: '' },

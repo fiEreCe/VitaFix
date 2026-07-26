@@ -1,0 +1,432 @@
+{
+  "generatedAt": "2026-07-25T14:53:22.089Z",
+  "ruleVersion": "pf002-rules-1",
+  "schemaVersion": "pf002-schema-1",
+  "total": 42,
+  "passed": 42,
+  "failed": 0,
+  "results": [
+    {
+      "caseId": "E2E-001",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "E2E-002",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "responsibility_expansion"
+        }
+      ]
+    },
+    {
+      "caseId": "E2E-003",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "E2E-004",
+      "expected": "warning",
+      "actual": "warning",
+      "pass": true,
+      "findings": [
+        {
+          "type": "estimated_number"
+        }
+      ]
+    },
+    {
+      "caseId": "E2E-005",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "unconfirmed_number"
+        },
+        {
+          "type": "attribution_expansion"
+        }
+      ]
+    },
+    {
+      "caseId": "E2E-006",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "E2E-007",
+      "expected": "unavailable",
+      "actual": "unavailable",
+      "pass": true,
+      "findings": [
+        {
+          "type": "invalid_schema"
+        }
+      ]
+    },
+    {
+      "caseId": "E2E-008",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "E2E-009",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "attribution_expansion"
+        },
+        {
+          "type": "responsibility_expansion"
+        }
+      ]
+    },
+    {
+      "caseId": "E2E-010",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "E2E-011",
+      "expected": "unavailable",
+      "actual": "unavailable",
+      "pass": true,
+      "findings": [
+        {
+          "type": "invalid_schema"
+        }
+      ]
+    },
+    {
+      "caseId": "E2E-012",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "A-001",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "unconfirmed_number"
+        }
+      ]
+    },
+    {
+      "caseId": "A-002",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "unconfirmed_number"
+        },
+        {
+          "type": "unsupported_claim"
+        }
+      ]
+    },
+    {
+      "caseId": "A-003",
+      "expected": "warning",
+      "actual": "warning",
+      "pass": true,
+      "findings": [
+        {
+          "type": "estimated_number"
+        }
+      ]
+    },
+    {
+      "caseId": "A-004",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "unqualified_estimate"
+        }
+      ]
+    },
+    {
+      "caseId": "A-005",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "attribution_expansion"
+        },
+        {
+          "type": "responsibility_expansion"
+        }
+      ]
+    },
+    {
+      "caseId": "A-006",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "A-007",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "responsibility_expansion"
+        }
+      ]
+    },
+    {
+      "caseId": "A-008",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "responsibility_expansion"
+        }
+      ]
+    },
+    {
+      "caseId": "A-009",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "learning_to_experience_expansion"
+        }
+      ]
+    },
+    {
+      "caseId": "A-010",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "project_status_expansion"
+        }
+      ]
+    },
+    {
+      "caseId": "A-011",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "credential_fabrication"
+        },
+        {
+          "type": "skill_fabrication"
+        }
+      ]
+    },
+    {
+      "caseId": "A-012",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "project_status_expansion"
+        }
+      ]
+    },
+    {
+      "caseId": "A-013",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "unsupported_claim"
+        }
+      ]
+    },
+    {
+      "caseId": "A-014",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "unsupported_claim"
+        }
+      ]
+    },
+    {
+      "caseId": "A-015",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "missing_fact_reference"
+        }
+      ]
+    },
+    {
+      "caseId": "A-016",
+      "expected": "unavailable",
+      "actual": "unavailable",
+      "pass": true,
+      "findings": [
+        {
+          "type": "invalid_schema"
+        }
+      ]
+    },
+    {
+      "caseId": "A-017",
+      "expected": "unavailable",
+      "actual": "unavailable",
+      "pass": true,
+      "findings": [
+        {
+          "type": "invalid_schema"
+        }
+      ]
+    },
+    {
+      "caseId": "A-018",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "A-019",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "A-020",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "A-021",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "A-022",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "A-023",
+      "expected": "unavailable",
+      "actual": "unavailable",
+      "pass": true,
+      "findings": [
+        {
+          "type": "invalid_schema"
+        }
+      ]
+    },
+    {
+      "caseId": "A-024",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "A-025",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "A-026",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    },
+    {
+      "caseId": "A-027",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "unconfirmed_number"
+        },
+        {
+          "type": "attribution_expansion"
+        }
+      ]
+    },
+    {
+      "caseId": "A-028",
+      "expected": "unavailable",
+      "actual": "unavailable",
+      "pass": true,
+      "findings": [
+        {
+          "type": "invalid_schema"
+        }
+      ]
+    },
+    {
+      "caseId": "A-029",
+      "expected": "blocked",
+      "actual": "blocked",
+      "pass": true,
+      "findings": [
+        {
+          "type": "attribution_expansion"
+        },
+        {
+          "type": "responsibility_expansion"
+        }
+      ]
+    },
+    {
+      "caseId": "A-030",
+      "expected": "passed",
+      "actual": "passed",
+      "pass": true,
+      "findings": []
+    }
+  ],
+  "modelVersion": "deepseek-chat",
+  "promptVersion": "pf001-agent-prompt-1",
+  "codeVersion": "local"
+}

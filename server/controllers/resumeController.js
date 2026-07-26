@@ -13,7 +13,7 @@ exports.create = async (req, res) => {
     // AI自动解析简历板块
     const parsed = await resumeParser.parse(rawText);
 
-    const resume = new Resume({ rawText, parsed });
+    const resume = new Resume({ userId: req.userId, rawText, parsed });
     await resume.save();
 
     res.status(201).json({ id: resume._id, parsed });
@@ -48,7 +48,7 @@ exports.upload = async (req, res) => {
     const parsed = await resumeParser.parse(rawText);
 
     // 3. 保存
-    const resume = new Resume({ rawText, parsed });
+    const resume = new Resume({ userId: req.userId, rawText, parsed });
     await resume.save();
 
     res.status(201).json({
@@ -66,8 +66,8 @@ exports.upload = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { parsed } = req.body;
-    const resume = await Resume.findByIdAndUpdate(
-      req.params.id,
+    const resume = await Resume.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
       { parsed, updatedAt: new Date() },
       { new: true }
     );
@@ -82,7 +82,7 @@ exports.update = async (req, res) => {
 
 exports.getById = async (req, res) => {
   try {
-    const resume = await Resume.findById(req.params.id);
+    const resume = await Resume.findOne({ _id: req.params.id, userId: req.userId });
     if (!resume) {
       return res.status(404).json({ error: '简历不存在' });
     }
