@@ -8,9 +8,9 @@ reviewers:
   - AI 负责人
   - 测试负责人
 status: draft
-version: "0.7"
+version: "0.8"
 created_at: 2026-07-23
-updated_at: 2026-07-24
+updated_at: 2026-07-27
 related_docs:
   - ./strategic-focus-for-portfolio.md
   - ./modules/portfolio-resume-agent.md
@@ -22,6 +22,7 @@ related_docs:
   - ./08-analytics-and-metrics.md
   - ./09-mvp-acceptance.md
   - ./10-v0.1-development-readiness-and-execution-plan.md
+  - ./11-development-handoff-2026-07-27.md
 ---
 
 # 精投助手版本规范与路线图
@@ -326,7 +327,26 @@ V1.0 的详细需求在 MVP 验证后冻结，但公开发布前至少必须具�
 
 ### 10.1 当前开发准入结论
 
-V0.1 当前为 `conditional_go`：产品逻辑允许进入开发，但必须先完成最小数据模型、API/JSON Schema、Agent 状态机、测试与评测运行方式以及 PF-004 最终规格五项技术基线。具体执行顺序和代码风险见 [V0.1 开发准入评估与执行顺序](./10-v0.1-development-readiness-and-execution-plan.md)。
+V0.1 已进入 `R1_in_progress`。AgentSession 状态持久化、并发幂等、失败恢复、自动化测试入口和用户资源所有权已经落地；旧数据所有权迁移工具已实现但尚未在真实 MongoDB 执行。
+
+当前仍不具备进入 R2 的条件：
+
+- PF-001 中文证据匹配、动态回答评估和多轮事实合并尚未修复。
+- PF-002 独立语义审核和跨用途数字检查尚未完成。
+- PF-003 修改效果语义判断、最终文本同步和 handoff 尚未闭环。
+- PF-004 fixture 真实契约、演示指标隔离和运行时契约测试尚未完成。
+
+当前实现状态和接手顺序见 [PF-001 至 PF-004 逻辑加固开发交接](./11-development-handoff-2026-07-27.md)。
+
+### 10.2 V0.1/P0 当前实现状态
+
+| 模块 | 状态 | 已完成 | 未完成 |
+|---|---|---|---|
+| PF-001 | `in_progress` | Agent 会话、任务状态、持久化、并发启动、恢复和用户隔离 | 中文匹配、回答质量、事实合并、动态问题 |
+| PF-002 | `in_progress` | 确定性护栏、四类结果、42 个固定案例和评测入口 | 独立语义审核、无关主张、数字单位/用途检查 |
+| PF-003 | `in_progress` | 基本验证记录、baseline 保存、风险完成状态 | 真实语义评估、证据覆盖、最终文本和 handoff 同步 |
+| PF-004 | `in_progress` | `/demo` 入口、预计算 fixture 和透明标记 | 完整真实状态契约、指标隔离、运行时契约测试 |
+| 数据所有权 | `implemented_not_run` | 全路径 owner 校验、cleanup、原子 Supplement、迁移脚本 | 真实 MongoDB dry-run、正式迁移和索引验证 |
 
 ## 11. 版本完成定义
 
@@ -406,3 +426,4 @@ V0.1 当前为 `conditional_go`：产品逻辑允许进入开发，但必须先�
 | 0.5 | 2026-07-24 | 将 PF-003 收敛为修改效果验证，将 PF-004 收敛为复用真实状态结构的预计算引导演示 | 核心定义已确认 |
 | 0.6 | 2026-07-24 | 冻结 PF-003 完成后统一验证、tradeoff、单次语义评估、风险完成和不可变记录 | 核心功能逻辑已确认 |
 | 0.7 | 2026-07-24 | 记录 V0.1 conditional_go 开发准入结论、五项技术前置和纵向实施顺序 | 已批准作为执行基线 |
+| 0.8 | 2026-07-27 | 同步 R1 实际进度：状态机与所有权已完成，PF-001 至 PF-004 仍在开发；新增开发交接入口 | 当前工程进度基线 |
