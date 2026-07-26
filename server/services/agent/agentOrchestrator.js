@@ -1,9 +1,15 @@
 const crypto = require('crypto');
 const { calculateSufficiency } = require('../../domain/agent/policy');
 const { inspectUserEdit } = require('../../domain/agent/guardrails');
-const { SESSION_STATES } = require('../../domain/agent/contracts');
 const { evaluateCandidate } = require('./pf002Evaluator');
 const { validate } = require('./modificationValidator');
+
+const ANALYSIS_STARTABLE_STATES = new Set(['draft', 'parsing_failed', 'matching_failed']);
+const ANALYSIS_ACTIVE_STATES = new Set(['parsing', 'matching']);
+const ANALYSIS_FINISHED_STATES = new Set([
+  'evidence_ready', 'task_in_progress', 'ready_for_reevaluation',
+  'completed', 'cancelled', 'expired',
+]);
 
 class AgentOrchestrator {
   constructor({ repository, tools }) {
@@ -22,9 +28,18 @@ class AgentOrchestrator {
   }
 
   async startAnalysis(id) {
-    const session = await this._get(id);
-    if (SESSION_STATES.indexOf(session.state) >= SESSION_STATES.indexOf('evidence_ready')) return session;
-    this._transition(session, null, 'parsing', 'ANALYSIS_STARTED');
+    const session = await this.repository.claimAnalysis(id, {
+      fromStates: [...ANALYSIS_STARTABLE_STATES],
+      to: 'parsing',
+      event: 'ANALYSIS_STARTED',
+      toolName: '',
+      at: new Date().toISOString(),
+    });
+    if (!session) {
+      const current = await this._get(id);
+      if (ANALYSIS_ACTIVE_STATES.has(current.state) || ANALYSIS_FINISHED_STATES.has(current.state)) return current;
+      throw new Error('AGENT_ANALYSIS_NOT_STARTABLE');
+    }
     let jd;
     let resume;
     try {

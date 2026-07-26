@@ -19,6 +19,16 @@ function harness(overrides = {}) {
       store.set(value.id, structuredClone(value));
       return structuredClone(store.get(value.id));
     },
+    async claimAnalysis(id, { fromStates, to, event, toolName, at }) {
+      const value = store.get(id);
+      if (!value || !fromStates.includes(value.state)) return null;
+      const claimed = structuredClone(value);
+      const from = claimed.state;
+      claimed.state = to;
+      claimed.transitions.push({ from, to, event, toolName, at });
+      store.set(id, structuredClone(claimed));
+      return structuredClone(claimed);
+    },
   };
   const calls = { parseJD: 0, parseResume: 0, matchEvidence: 0 };
   const tools = {
@@ -106,6 +116,47 @@ test('analysis is idempotent after evidence is ready and preserves tasks', async
   assert.deepEqual(repeated.tasks, ready.tasks);
   assert.deepEqual(calls, { parseJD: 1, parseResume: 1, matchEvidence: 1 });
   assert.equal(repeated.transitions.length, 3);
+});
+
+test('overlapping analysis starts atomically claim one tool run without overwriting tasks', async () => {
+  let releaseParsing;
+  const parsingGate = new Promise((resolve) => { releaseParsing = resolve; });
+  const calls = { parseJD: 0, parseResume: 0, matchEvidence: 0 };
+  const { app, repository } = harness({
+    parseJD: async () => {
+      calls.parseJD += 1;
+      await parsingGate;
+      return { requirements: [{ id: 'req-1' }] };
+    },
+    parseResume: async () => {
+      calls.parseResume += 1;
+      await parsingGate;
+      return { facts: [{ id: 'fact-1', confirmation: 'confirmed' }] };
+    },
+    matchEvidence: async () => {
+      calls.matchEvidence += 1;
+      return { matches: [{ requirementId: `req-${calls.matchEvidence}`, factIds: ['fact-1'], gapType: 'expression', priority: 10 }] };
+    },
+  });
+  const created = await app.createSession({ userId: 'user-1', jdText: 'JD', resumeText: 'Resume' });
+
+  const first = app.startAnalysis(created.id);
+  const second = app.startAnalysis(created.id);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(calls, { parseJD: 1, parseResume: 1, matchEvidence: 0 });
+
+  releaseParsing();
+  await Promise.all([first, second]);
+  const completed = await repository.get(created.id);
+
+  assert.deepEqual(calls, { parseJD: 1, parseResume: 1, matchEvidence: 1 });
+  assert.equal(completed.state, 'evidence_ready');
+  assert.equal(completed.tasks[0].requirementId, 'req-1');
+  assert.deepEqual(completed.transitions.map(({ from, to }) => ({ from, to })), [
+    { from: 'draft', to: 'parsing' },
+    { from: 'parsing', to: 'matching' },
+    { from: 'matching', to: 'evidence_ready' },
+  ]);
 });
 
 test('parse failure is persisted and retry resumes from parsing_failed', async () => {

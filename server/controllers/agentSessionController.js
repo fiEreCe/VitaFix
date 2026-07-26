@@ -9,6 +9,21 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
     create: async (value) => new AgentSession(value).save(),
     get: async (id, userId) => AgentSession.findOne({ _id: id, ...(userId ? { userId } : {}) }),
     save: async (value) => value.save(),
+    claimAnalysis: async (id, { fromStates, to, event, toolName, at }) => AgentSession.findOneAndUpdate(
+      { _id: id, state: { $in: fromStates } },
+      [{
+        $set: {
+          state: to,
+          transitions: {
+            $concatArrays: [
+              { $ifNull: ['$transitions', []] },
+              [{ from: '$state', to, event, toolName, at }],
+            ],
+          },
+        },
+      }],
+      { new: true },
+    ),
   };
   const app = orchestrator || new AgentOrchestrator({ repository, tools });
   const getInputs = loadInputs || (async (jdId, resumeId) => {
