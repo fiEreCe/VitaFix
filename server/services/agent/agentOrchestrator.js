@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { calculateSufficiency } = require('../../domain/agent/policy');
 const { inspectUserEdit } = require('../../domain/agent/guardrails');
+const { SESSION_STATES } = require('../../domain/agent/contracts');
 const { evaluateCandidate } = require('./pf002Evaluator');
 const { validate } = require('./modificationValidator');
 
@@ -22,14 +23,30 @@ class AgentOrchestrator {
 
   async startAnalysis(id) {
     const session = await this._get(id);
+    if (SESSION_STATES.indexOf(session.state) >= SESSION_STATES.indexOf('evidence_ready')) return session;
     this._transition(session, null, 'parsing', 'ANALYSIS_STARTED');
-    const [jd, resume] = await Promise.all([
-      this.tools.parseJD(session.inputSnapshot.jdText), this.tools.parseResume(session.inputSnapshot.resumeText),
-    ]);
+    let jd;
+    let resume;
+    try {
+      [jd, resume] = await Promise.all([
+        this.tools.parseJD(session.inputSnapshot.jdText), this.tools.parseResume(session.inputSnapshot.resumeText),
+      ]);
+    } catch (error) {
+      this._transition(session, null, 'parsing_failed', 'INPUT_PARSE_FAILED');
+      await this.repository.save(session);
+      throw error;
+    }
     session.requirements = jd.requirements;
     session.resumeFacts = resume.facts;
     this._transition(session, null, 'matching', 'INPUT_PARSED');
-    const matchResult = await this.tools.matchEvidence({ requirements: jd.requirements, facts: resume.facts });
+    let matchResult;
+    try {
+      matchResult = await this.tools.matchEvidence({ requirements: jd.requirements, facts: resume.facts });
+    } catch (error) {
+      this._transition(session, null, 'matching_failed', 'EVIDENCE_MATCH_FAILED');
+      await this.repository.save(session);
+      throw error;
+    }
     session.matches = matchResult.matches;
     session.tasks = matchResult.matches.map((match, index) => ({
       id: `task-${index + 1}`, requirementId: match.requirementId, factIds: match.factIds || [],
@@ -43,12 +60,11 @@ class AgentOrchestrator {
 
   async selectTask(id, taskId) {
     const session = await this._get(id); const task = this._task(session, taskId);
-    task.state = 'assessing_evidence'; session.currentTaskId = taskId;
+    session.currentTaskId = taskId;
     const facts = this._factsForTask(session, task);
     task.sufficiency = facts.length ? calculateSufficiency(facts[0]) : 'insufficient';
-    task.state = task.sufficiency === 'insufficient' ? 'questioning' : 'generating';
-    this._transition(session, task, task.state, 'TASK_SELECTED');
-    session.state = 'task_in_progress';
+    this._transition(session, task, task.sufficiency === 'insufficient' ? 'questioning' : 'generating', 'TASK_SELECTED');
+    this._transition(session, null, 'task_in_progress', 'TASK_SELECTED');
     return this.repository.save(session);
   }
 
@@ -56,7 +72,10 @@ class AgentOrchestrator {
     const session = await this._get(id); const task = this._task(session, taskId);
     const facts = this._factsForTask(session, task).filter((fact) => ['confirmed', 'corrected'].includes(fact.confirmation));
     task.sufficiency = facts.length ? calculateSufficiency(facts[0]) : 'insufficient';
-    if (task.sufficiency === 'insufficient') { task.state = 'questioning'; return this.repository.save(session); }
+    if (task.sufficiency === 'insufficient') {
+      this._transition(session, task, 'questioning', 'INSUFFICIENT_EVIDENCE');
+      return this.repository.save(session);
+    }
     const requirement = session.requirements.find((item) => item.id === task.requirementId);
     const draft = async () => {
       try { return await this.tools.draftRevision({ requirement, facts, sufficiency: task.sufficiency }); }
@@ -85,19 +104,30 @@ class AgentOrchestrator {
       }
     }
     task.candidate = { ...candidate, verification, contentSource: 'ai_generated' };
-    task.state = ['passed', 'warning'].includes(verification.status) ? 'awaiting_user_decision' : verification.status === 'unavailable' ? 'verification_failed' : 'generation_failed';
-    this._transition(session, task, task.state, 'CANDIDATE_GENERATED', 'draftRevision');
+    const nextState = ['passed', 'warning'].includes(verification.status) ? 'awaiting_user_decision' : verification.status === 'unavailable' ? 'verification_failed' : 'generation_failed';
+    this._transition(session, task, nextState, 'CANDIDATE_GENERATED', 'draftRevision');
     return this.repository.save(session);
   }
 
   async submitAnswer(id, taskId, answer) {
     const session = await this._get(id); const task = this._task(session, taskId);
-    if (task.effectiveRounds >= 3) { task.state = 'return_control'; return this.repository.save(session); }
-    if (['不记得', '无法证明'].includes(answer)) { task.effectiveRounds += 1; task.state = task.effectiveRounds >= 3 ? 'return_control' : 'questioning'; return this.repository.save(session); }
-    if (answer === '没有做过') { task.state = 'capability_gap'; task.gapType = 'capability'; return this.repository.save(session); }
+    if (task.effectiveRounds >= 3) {
+      this._transition(session, task, 'return_control', 'QUESTION_LIMIT_REACHED');
+      return this.repository.save(session);
+    }
+    if (['不记得', '无法证明'].includes(answer)) {
+      task.effectiveRounds += 1;
+      this._transition(session, task, task.effectiveRounds >= 3 ? 'return_control' : 'questioning', 'ANSWER_SUBMITTED');
+      return this.repository.save(session);
+    }
+    if (answer === '没有做过') {
+      task.gapType = 'capability';
+      this._transition(session, task, 'capability_gap', 'ANSWER_SUBMITTED');
+      return this.repository.save(session);
+    }
     const fact = { id: `fact-${session.resumeFacts.length + 1}`, sourceText: answer, action: answer, context: '', contribution: '', method: '', result: '', quantity: '', confirmation: 'pending_confirmation' };
-    session.resumeFacts.push(fact); task.factIds.push(fact.id); task.effectiveRounds += 1; task.pendingFactId = fact.id; task.state = 'awaiting_fact_confirmation';
-    this._transition(session, task, task.state, 'ANSWER_SUBMITTED');
+    session.resumeFacts.push(fact); task.factIds.push(fact.id); task.effectiveRounds += 1; task.pendingFactId = fact.id;
+    this._transition(session, task, 'awaiting_fact_confirmation', 'ANSWER_SUBMITTED');
     return this.repository.save(session);
   }
 
@@ -108,35 +138,35 @@ class AgentOrchestrator {
     else if (decision === 'confirm') fact.confirmation = 'confirmed';
     else if (decision === 'reject') fact.confirmation = 'rejected';
     else throw new Error('INVALID_FACT_DECISION');
-    task.state = decision === 'reject' ? 'questioning' : 'generating';
-    this._transition(session, task, task.state, 'FACT_REVIEWED');
+    this._transition(session, task, decision === 'reject' ? 'questioning' : 'generating', 'FACT_REVIEWED');
     return this.repository.save(session);
   }
 
   async decide(id, taskId, decision) {
     const session = await this._get(id); const task = this._task(session, taskId);
+    let nextState;
     if (decision.type === 'user_edited') {
       task.validationBaseline = task.validationBaseline || task.candidate?.text || this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n');
       task.candidate = { text: decision.text, contentSource: 'user_edited', verification: inspectUserEdit(decision.text, this._factsForTask(session, task)) };
-      task.state = 'user_edited';
+      nextState = 'user_edited';
     } else {
       if (!['accepted', 'rejected', 'skipped'].includes(decision.type)) throw new Error('INVALID_DECISION');
       if (decision.type === 'accepted' && (task.state !== 'awaiting_user_decision' || !['passed', 'warning'].includes(task.candidate?.verification?.status))) throw new Error('CANDIDATE_NOT_ADOPTABLE');
-      task.state = decision.type;
+      nextState = decision.type;
     }
-    if (!['accepted', 'rejected', 'skipped', 'user_edited'].includes(task.state)) throw new Error('INVALID_DECISION');
-    if (['accepted', 'user_edited'].includes(task.state)) {
+    if (!['accepted', 'rejected', 'skipped', 'user_edited'].includes(nextState)) throw new Error('INVALID_DECISION');
+    this._transition(session, task, nextState, 'USER_DECISION');
+    if (['accepted', 'user_edited'].includes(nextState)) {
       session.handoff = { taskId, originalText: this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n'), finalText: task.candidate?.text || '', factRefs: task.candidate?.factRefs || task.factIds, contentSource: task.candidate?.contentSource || 'ai_generated', verificationStatus: task.candidate?.verification?.status || 'unavailable', riskAcknowledged: Boolean(decision.riskAcknowledged) };
-      session.state = 'ready_for_reevaluation';
+      this._transition(session, null, 'ready_for_reevaluation', 'USER_DECISION');
     }
-    this._transition(session, task, task.state, 'USER_DECISION');
     return this.repository.save(session);
   }
 
   async chooseReturnControl(id, taskId, action, text = '') {
     const session = await this._get(id); const task = this._task(session, taskId);
-    if (action === 'continue') { task.state = 'questioning'; task.effectiveRounds = 0; }
-    else if (action === 'skip') task.state = 'skipped';
+    if (action === 'continue') { task.effectiveRounds = 0; this._transition(session, task, 'questioning', 'RETURN_CONTROL_CHOSEN'); }
+    else if (action === 'skip') this._transition(session, task, 'skipped', 'RETURN_CONTROL_CHOSEN');
     else if (action === 'manual_edit') return this.decide(id, taskId, { type: 'user_edited', text, riskAcknowledged: true });
     else if (action === 'conservative') return this.generateCandidate(id, taskId);
     else throw new Error('INVALID_RETURN_CONTROL_ACTION');
@@ -150,15 +180,14 @@ class AgentOrchestrator {
     const baselineText = task.validationBaseline || task.candidate?.text || this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n');
     const record = validate({ baselineText, currentText, facts: this._factsForTask(session, task), factRefs: task.candidate?.factRefs || task.factIds, semanticJudge: this.tools.evaluateModification });
     task.validationRecords = [...(task.validationRecords || []), record]; task.validationBaseline = currentText; task.currentText = currentText;
-    task.state = record.safetyStatus === 'blocked' ? 'user_edited' : 'ready_for_reevaluation';
-    this._transition(session, task, task.state, 'MODIFICATION_VALIDATED', 'evaluateModification');
+    this._transition(session, task, record.safetyStatus === 'blocked' ? 'user_edited' : 'ready_for_reevaluation', 'MODIFICATION_VALIDATED', 'evaluateModification');
     return this.repository.save(session);
   }
 
   async completeWithRisk(id, taskId) {
     const session = await this._get(id); const task = this._task(session, taskId); const latest = task.validationRecords?.at(-1);
     if (latest?.safetyStatus !== 'blocked') throw new Error('RISK_ACKNOWLEDGEMENT_NOT_AVAILABLE');
-    task.state = 'completed_with_risk'; this._transition(session, task, task.state, 'RISK_ACKNOWLEDGED');
+    this._transition(session, task, 'completed_with_risk', 'RISK_ACKNOWLEDGED');
     return this.repository.save(session);
   }
 
@@ -167,8 +196,7 @@ class AgentOrchestrator {
     if (!['generation_failed', 'verification_failed'].includes(task.state)) throw new Error('TASK_NOT_RETRYABLE');
     if ((task.retryCount || 0) >= 3) throw new Error('TASK_RETRY_LIMIT_REACHED');
     task.retryCount = (task.retryCount || 0) + 1;
-    task.state = 'generating';
-    this._transition(session, task, task.state, 'RETRY_REQUESTED');
+    this._transition(session, task, 'generating', 'RETRY_REQUESTED');
     await this.repository.save(session);
     return this.generateCandidate(id, taskId);
   }
@@ -176,7 +204,12 @@ class AgentOrchestrator {
   async _get(id) { const value = await this.repository.get(id); if (!value) throw new Error('AGENT_SESSION_NOT_FOUND'); return value; }
   _task(session, id) { const task = session.tasks.find((item) => item.id === id); if (!task) throw new Error('AGENT_TASK_NOT_FOUND'); return task; }
   _factsForTask(session, task) { return session.resumeFacts.filter((fact) => task.factIds.includes(fact.id)); }
-  _transition(session, task, to, event, toolName = '') { session.transitions.push({ from: task ? task.state : session.state, to, event, toolName, at: new Date().toISOString() }); }
+  _transition(session, task, to, event, toolName = '') {
+    const target = task || session;
+    const from = target.state;
+    target.state = to;
+    session.transitions.push({ from, to, event, toolName, at: new Date().toISOString() });
+  }
 }
 
 module.exports = { AgentOrchestrator };

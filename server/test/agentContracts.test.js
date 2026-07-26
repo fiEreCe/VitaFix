@@ -13,7 +13,7 @@ test('rejects an evidence match that references an unknown fact', () => {
 
 test('exports the complete V0.1 session state set', () => {
   assert.deepEqual(SESSION_STATES, [
-    'draft', 'parsing', 'matching', 'evidence_ready', 'task_in_progress',
+    'draft', 'parsing', 'parsing_failed', 'matching', 'matching_failed', 'evidence_ready', 'task_in_progress',
     'ready_for_reevaluation', 'completed', 'cancelled', 'expired',
   ]);
 });

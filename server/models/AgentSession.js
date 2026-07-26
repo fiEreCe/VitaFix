@@ -9,6 +9,8 @@ const taskSchema = new mongoose.Schema({
   id: String, requirementId: String, factIds: [String], gapType: String, priority: Number,
   state: { type: String, enum: TASK_STATES }, effectiveRounds: Number, clarificationUsed: Boolean,
   confirmedFacts: [factSchema], candidate: mongoose.Schema.Types.Mixed, recommended: Boolean, sufficiency: String, retryCount: Number, repairAttempts: Number, evaluationRetryAttempts: Number, validationRecords: [mongoose.Schema.Types.Mixed], validationBaseline: String, currentText: String,
+  pendingFactId: String, pendingBaseFactId: String, currentQuestion: String, questionTarget: String,
+  lastAnswerAssessment: mongoose.Schema.Types.Mixed, initialText: String, riskAcknowledged: { type: Boolean, default: false },
 }, { _id: false });
 const transitionSchema = new mongoose.Schema({ from: String, to: String, event: String, toolName: String, at: String }, { _id: false });
 const schema = new mongoose.Schema({
