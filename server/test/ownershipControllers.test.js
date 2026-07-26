@@ -65,18 +65,22 @@ test('Resume create and update store or filter by userId', async (t) => {
 });
 
 test('Supplement upsert filters by resumeId and userId and stores userId', async (t) => {
-  const oldFindOne = Supplement.findOne;
-  const oldSave = Supplement.prototype.save;
+  const oldExists = Resume.exists;
+  const oldUpdate = Supplement.findOneAndUpdate;
   let filter;
-  let saved;
-  Supplement.findOne = async (value) => { filter = value; return null; };
-  Supplement.prototype.save = async function save() { saved = this.toObject(); return this; };
-  t.after(() => { Supplement.findOne = oldFindOne; Supplement.prototype.save = oldSave; });
+  let update;
+  Resume.exists = async () => true;
+  Supplement.findOneAndUpdate = async (value, changes) => {
+    filter = value;
+    update = changes;
+    return { _id: 's1', items: [] };
+  };
+  t.after(() => { Resume.exists = oldExists; Supplement.findOneAndUpdate = oldUpdate; });
 
   await supplementController.upsert({ userId: 'u1', body: { resumeId: '507f1f77bcf86cd799439011', items: [] } }, response());
   assert.equal(filter.userId, 'u1');
   assert.equal(filter.resumeId, '507f1f77bcf86cd799439011');
-  assert.equal(saved.userId, 'u1');
+  assert.equal(update.$setOnInsert.userId, 'u1');
 });
 
 test('Analysis status lookup filters by id and current owner', async (t) => {

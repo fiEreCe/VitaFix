@@ -6,26 +6,51 @@ const AgentSession = require('../models/AgentSession');
 const JD = require('../models/JD');
 const Resume = require('../models/Resume');
 const Supplement = require('../models/Supplement');
-const { runOwnershipMigration } = require('../services/ownershipMigration');
+const {
+  createMongooseOwnershipRepositories,
+  runOwnershipMigration,
+} = require('../services/ownershipMigration');
 
-async function main() {
-  const dryRun = process.argv.slice(2).includes('--dry-run');
+async function runMigrationCli({
+  argv = process.argv.slice(2),
+  mongoose: database = mongoose,
+  repositories = createMongooseOwnershipRepositories({
+    Analysis,
+    AgentSession,
+    JD,
+    Resume,
+    Supplement,
+  }),
+  runMigration = runOwnershipMigration,
+  processState = process,
+  logger = console,
+} = {}) {
+  const dryRun = argv.includes('--dry-run');
+  let summary = null;
   try {
-    await mongoose.connect(config.mongodbUri, { serverSelectionTimeoutMS: 5000 });
-    const summary = await runOwnershipMigration({
-      analyses: Analysis,
-      agentSessions: AgentSession,
-      jds: JD,
-      resumes: Resume,
-      supplements: Supplement,
-    }, { dryRun });
-    console.log(JSON.stringify(summary));
+    await database.connect(config.mongodbUri, { serverSelectionTimeoutMS: 5000 });
+    summary = await runMigration(repositories, { dryRun });
   } catch (error) {
-    console.error(`Ownership migration failed: ${error.message}`);
-    process.exitCode = 1;
+    logger.error(`Ownership migration failed: ${error.message}`);
+    processState.exitCode = 1;
   } finally {
-    await mongoose.disconnect();
+    try {
+      await database.disconnect();
+    } catch (error) {
+      logger.error(`Ownership migration disconnect failed: ${error.message}`);
+      processState.exitCode = 1;
+      summary = null;
+    }
   }
+  if (summary && processState.exitCode !== 1) logger.log(JSON.stringify(summary));
+  return summary;
 }
 
-void main();
+if (require.main === module) {
+  runMigrationCli().catch((error) => {
+    console.error(`Ownership migration failed: ${error.message}`);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { runMigrationCli };

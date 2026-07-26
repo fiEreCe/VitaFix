@@ -4,19 +4,33 @@ const assert = require('node:assert/strict');
 const JD = require('../models/JD');
 const Resume = require('../models/Resume');
 const Supplement = require('../models/Supplement');
-const { runOwnershipMigration } = require('../services/ownershipMigration');
+const {
+  createMongooseOwnershipRepositories,
+  runOwnershipMigration,
+} = require('../services/ownershipMigration');
 
 function collection(rows) {
   return {
     rows: rows.map((row) => ({ ...row })),
     updates: [],
-    async find() { return this.rows.map((row) => ({ ...row })); },
+    scans: [],
+    async *scan(options) {
+      this.scans.push(options);
+      const keys = options.projection.split(/\s+/);
+      for (const row of [...this.rows].sort((a, b) => String(a._id).localeCompare(String(b._id)))) {
+        yield Object.fromEntries(keys.filter((key) => key in row).map((key) => [key, row[key]]));
+      }
+    },
+    async findOwnerById(id) {
+      const row = this.rows.find((item) => item._id === id);
+      return row ? { found: true, userId: row.userId } : { found: false };
+    },
     async updateOne(filter, update) {
       this.updates.push({ filter, update });
       const row = this.rows.find((item) => item._id === filter._id && (!filter.userId || item.userId === filter.userId));
-      if (!row) return { modifiedCount: 0 };
+      if (!row) return { matchedCount: 0, modifiedCount: 0 };
       Object.assign(row, update.$set);
-      return { modifiedCount: 1 };
+      return { matchedCount: 1, modifiedCount: 1 };
     },
   };
 }
@@ -66,9 +80,9 @@ test('migration assigns only uniquely proven owners and reports conflicts and or
 
   assert.deepEqual(summary, {
     dryRun: false,
-    jd: { updated: 1, unchanged: 0, conflicts: 1, orphaned: 1 },
-    resume: { updated: 1, unchanged: 0, conflicts: 2, orphaned: 0 },
-    supplement: { updated: 0, unchanged: 1, conflicts: 0, orphaned: 1 },
+    jd: { updated: 1, unchanged: 0, conflicts: 1, orphaned: 1, updatedIds: ['jd-unique'], conflictIds: ['jd-conflict'], orphanedIds: ['jd-orphan'] },
+    resume: { updated: 1, unchanged: 0, conflicts: 2, orphaned: 0, updatedIds: ['resume-unique'], conflictIds: ['resume-conflict', 'resume-owned-different'], orphanedIds: [] },
+    supplement: { updated: 0, unchanged: 1, conflicts: 0, orphaned: 1, updatedIds: [], conflictIds: [], orphanedIds: ['supp-orphan'] },
   });
   assert.equal(repos.jds.rows.find((row) => row._id === 'jd-unique').userId, 'u1');
   assert.equal(repos.jds.rows.find((row) => row._id === 'jd-conflict').userId, undefined);
@@ -89,4 +103,116 @@ test('dry run reports prospective updates without writing and repeated migration
   assert.equal(repeated.jd.unchanged, 1);
   assert.equal(repeated.resume.updated, 0);
   assert.equal(repeated.resume.unchanged, 1);
+});
+
+test('concurrent owner assignment is re-read and reported exactly instead of as updated', async () => {
+  const repos = {
+    analyses: collection([{ _id: 'a1', userId: 'u1', jdId: 'jd1' }]),
+    agentSessions: collection([]),
+    jds: collection([{ _id: 'jd1' }]),
+    resumes: collection([]),
+    supplements: collection([]),
+  };
+  repos.jds.updateOne = async () => {
+    repos.jds.rows[0].userId = 'u2';
+    return { matchedCount: 0, modifiedCount: 0 };
+  };
+  const summary = await runOwnershipMigration(repos, { dryRun: false });
+  assert.equal(summary.jd.updated, 0);
+  assert.equal(summary.jd.conflicts, 1);
+  assert.deepEqual(summary.jd.updatedIds, []);
+  assert.deepEqual(summary.jd.conflictIds, ['jd1']);
+});
+
+test('concurrent assignment to the proven owner is re-read as unchanged', async () => {
+  const repos = {
+    analyses: collection([{ _id: 'a1', userId: 'u1', jdId: 'jd1' }]),
+    agentSessions: collection([]),
+    jds: collection([{ _id: 'jd1' }]),
+    resumes: collection([]),
+    supplements: collection([]),
+  };
+  repos.jds.updateOne = async () => {
+    repos.jds.rows[0].userId = 'u1';
+    return { matchedCount: 0, modifiedCount: 0 };
+  };
+  const summary = await runOwnershipMigration(repos, { dryRun: false });
+  assert.equal(summary.jd.updated, 0);
+  assert.equal(summary.jd.unchanged, 1);
+  assert.deepEqual(summary.jd.conflictIds, []);
+});
+
+test('migration scans sorted projections only and never requests raw payload fields', async () => {
+  const repos = repositories();
+  await runOwnershipMigration(repos, { dryRun: true });
+  assert.deepEqual(repos.analyses.scans, [{
+    projection: '_id userId jdId resumeId supplementId',
+    sort: { _id: 1 },
+  }]);
+  assert.deepEqual(repos.agentSessions.scans, [{
+    projection: '_id userId jdId resumeId',
+    sort: { _id: 1 },
+  }]);
+  for (const repository of [repos.jds, repos.resumes, repos.supplements]) {
+    assert.deepEqual(repository.scans, [{
+      projection: '_id userId',
+      sort: { _id: 1 },
+    }]);
+  }
+  const allRequested = Object.values(repos).flatMap((repo) => repo.scans.map((scan) => scan.projection)).join(' ');
+  assert.doesNotMatch(allRequested, /rawText|inputSnapshot|analysis/);
+});
+
+test('Mongoose adapters build projected sorted lean cursors instead of materializing full documents', async () => {
+  const calls = [];
+  function Model(name) {
+    return {
+      find(filter, projection) {
+        const call = { name, filter, projection };
+        calls.push(call);
+        return {
+          sort(value) { call.sort = value; return this; },
+          lean() { call.lean = true; return this; },
+          cursor() {
+            call.cursor = true;
+            return (async function* rows() {})();
+          },
+        };
+      },
+    };
+  }
+  const repositories = createMongooseOwnershipRepositories({
+    Analysis: Model('analysis'),
+    AgentSession: Model('session'),
+    JD: Model('jd'),
+    Resume: Model('resume'),
+    Supplement: Model('supplement'),
+  });
+  for await (const ignored of repositories.analyses.scan({
+    projection: '_id userId jdId resumeId supplementId',
+    sort: { _id: 1 },
+  })) void ignored;
+  assert.deepEqual(calls, [{
+    name: 'analysis',
+    filter: {},
+    projection: '_id userId jdId resumeId supplementId',
+    sort: { _id: 1 },
+    lean: true,
+    cursor: true,
+  }]);
+});
+
+test('audit ID ordering is stable across shuffled input and matches dry-run ordering', async () => {
+  const shuffled = repositories();
+  shuffled.jds.rows.reverse();
+  shuffled.resumes.rows.reverse();
+  shuffled.supplements.rows.reverse();
+  shuffled.analyses.rows.reverse();
+  const dry = await runOwnershipMigration(shuffled, { dryRun: true });
+  const actual = await runOwnershipMigration(repositories(), { dryRun: false });
+  for (const key of ['jd', 'resume', 'supplement']) {
+    assert.deepEqual(dry[key].updatedIds, actual[key].updatedIds);
+    assert.deepEqual(dry[key].conflictIds, actual[key].conflictIds);
+    assert.deepEqual(dry[key].orphanedIds, actual[key].orphanedIds);
+  }
 });

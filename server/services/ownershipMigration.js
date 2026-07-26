@@ -10,54 +10,126 @@ function addProof(map, resourceId, userId) {
   map.get(id).add(String(userId));
 }
 
-async function migrateResources(repository, proofs, dryRun) {
-  const result = { updated: 0, unchanged: 0, conflicts: 0, orphaned: 0 };
-  const resources = await repository.find({});
-  resources.sort((left, right) => asId(left._id).localeCompare(asId(right._id)));
+function createMongooseRepository(Model) {
+  return {
+    scan({ projection, sort }) {
+      return Model.find({}, projection).sort(sort).lean().cursor();
+    },
+    updateOne: (...args) => Model.updateOne(...args),
+    async findOwnerById(id) {
+      const value = await Model.findOne({ _id: id }, '_id userId').lean();
+      return value ? { found: true, userId: value.userId } : { found: false };
+    },
+  };
+}
 
-  for (const resource of resources) {
-    const owners = proofs.get(asId(resource._id)) || new Set();
+function createMongooseOwnershipRepositories({
+  Analysis,
+  AgentSession,
+  JD,
+  Resume,
+  Supplement,
+}) {
+  return {
+    analyses: createMongooseRepository(Analysis),
+    agentSessions: createMongooseRepository(AgentSession),
+    jds: createMongooseRepository(JD),
+    resumes: createMongooseRepository(Resume),
+    supplements: createMongooseRepository(Supplement),
+  };
+}
+
+function emptyResult() {
+  return {
+    updated: 0,
+    unchanged: 0,
+    conflicts: 0,
+    orphaned: 0,
+    updatedIds: [],
+    conflictIds: [],
+    orphanedIds: [],
+  };
+}
+
+function record(result, classification, id) {
+  if (classification === 'updated') {
+    result.updated += 1;
+    result.updatedIds.push(id);
+  } else if (classification === 'conflict') {
+    result.conflicts += 1;
+    result.conflictIds.push(id);
+  } else if (classification === 'orphaned') {
+    result.orphaned += 1;
+    result.orphanedIds.push(id);
+  } else {
+    result.unchanged += 1;
+  }
+}
+
+async function migrateResources(repository, proofs, dryRun) {
+  const result = emptyResult();
+  const resources = repository.scan({
+    projection: '_id userId',
+    sort: { _id: 1 },
+  });
+
+  for await (const resource of resources) {
+    const id = asId(resource._id);
+    const owners = proofs.get(id) || new Set();
     if (owners.size > 1) {
-      result.conflicts += 1;
+      record(result, 'conflict', id);
       continue;
     }
     if (owners.size === 0) {
-      if (resource.userId) result.unchanged += 1;
-      else result.orphaned += 1;
+      record(result, resource.userId ? 'unchanged' : 'orphaned', id);
       continue;
     }
 
     const [provenOwner] = owners;
     if (resource.userId) {
-      if (String(resource.userId) === provenOwner) result.unchanged += 1;
-      else result.conflicts += 1;
+      record(result, String(resource.userId) === provenOwner ? 'unchanged' : 'conflict', id);
+      continue;
+    }
+    if (dryRun) {
+      record(result, 'updated', id);
       continue;
     }
 
-    result.updated += 1;
-    if (!dryRun) {
-      await repository.updateOne(
-        { _id: resource._id, userId: resource.userId ?? null },
-        { $set: { userId: provenOwner } },
-      );
+    const write = await repository.updateOne(
+      { _id: resource._id, userId: resource.userId ?? null },
+      { $set: { userId: provenOwner } },
+    );
+    if (write.modifiedCount === 1) {
+      record(result, 'updated', id);
+      continue;
     }
+
+    const current = await repository.findOwnerById(resource._id);
+    if (!current.found) record(result, 'unchanged', id);
+    else if (current.userId && String(current.userId) === provenOwner) record(result, 'unchanged', id);
+    else record(result, 'conflict', id);
   }
+
+  result.updatedIds.sort();
+  result.conflictIds.sort();
+  result.orphanedIds.sort();
   return result;
 }
 
 async function runOwnershipMigration(repositories, { dryRun = false } = {}) {
   const proofs = { jd: new Map(), resume: new Map(), supplement: new Map() };
-  const [analyses, sessions] = await Promise.all([
-    repositories.analyses.find({}),
-    repositories.agentSessions.find({}),
-  ]);
-
-  for (const analysis of analyses) {
+  for await (const analysis of repositories.analyses.scan({
+    projection: '_id userId jdId resumeId supplementId',
+    sort: { _id: 1 },
+  })) {
     addProof(proofs.jd, analysis.jdId, analysis.userId);
     addProof(proofs.resume, analysis.resumeId, analysis.userId);
     addProof(proofs.supplement, analysis.supplementId, analysis.userId);
   }
-  for (const session of sessions) {
+  for await (const session of repositories.agentSessions.scan({
+    projection: '_id userId jdId resumeId',
+    sort: { _id: 1 },
+  })) {
     addProof(proofs.jd, session.jdId, session.userId);
     addProof(proofs.resume, session.resumeId, session.userId);
   }
@@ -70,4 +142,7 @@ async function runOwnershipMigration(repositories, { dryRun = false } = {}) {
   };
 }
 
-module.exports = { runOwnershipMigration };
+module.exports = {
+  createMongooseOwnershipRepositories,
+  runOwnershipMigration,
+};
