@@ -7,7 +7,9 @@
     "start": "node app.js",
     "dev": "node --watch app.js",
     "test": "node --test",
-    "evaluate:pf002": "node scripts/run-pf002-evaluation.js evaluations/reports"
+    "evaluate:pf002": "node scripts/run-pf002-evaluation.js evaluations/reports",
+    "migrate:ownership": "node scripts/migrate-ownership.js",
+    "migrate:ownership:dry": "node scripts/migrate-ownership.js --dry-run"
   },
   "keywords": [],
   "author": "",

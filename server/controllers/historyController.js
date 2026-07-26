@@ -13,7 +13,7 @@ exports.list = async (req, res) => {
 
     const [records, total] = await Promise.all([
       Analysis.find(query, 'name jdId analysis.overallScore analysis.overallGrade createdAt')
-        .populate('jdId', 'parsed.company parsed.position')
+        .populate({ path: 'jdId', select: 'parsed.company parsed.position', match: { userId: req.userId } })
         .sort({ createdAt: sortOrder })
         .skip(skip)
         .limit(parseInt(pageSize))

@@ -21,8 +21,8 @@ exports.create = async (req, res) => {
 
     // 获取JD和简历
     const [jd, resume] = await Promise.all([
-      JD.findById(jdId),
-      Resume.findById(resumeId),
+      JD.findOne({ _id: jdId, userId: req.userId }),
+      Resume.findOne({ _id: resumeId, userId: req.userId }),
     ]);
 
     if (!jd) return res.status(404).json({ error: 'JD不存在' });
@@ -39,7 +39,7 @@ exports.create = async (req, res) => {
     await analysis.save();
 
     // 获取补充信息
-    const supplement = await Supplement.findOne({ resumeId });
+    const supplement = await Supplement.findOne({ resumeId, userId: req.userId });
 
     // 异步执行AI分析
     setImmediate(async () => {
@@ -82,9 +82,9 @@ exports.create = async (req, res) => {
  */
 exports.getById = async (req, res) => {
   try {
-    const analysis = await Analysis.findById(req.params.id)
-      .populate('jdId', 'rawText parsed')
-      .populate('resumeId', 'rawText parsed');
+    const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.userId })
+      .populate({ path: 'jdId', select: 'rawText parsed', match: { userId: req.userId } })
+      .populate({ path: 'resumeId', select: 'rawText parsed', match: { userId: req.userId } });
 
     if (!analysis) {
       return res.status(404).json({ error: '分析记录不存在' });
@@ -101,7 +101,7 @@ exports.getById = async (req, res) => {
  */
 exports.getStatus = async (req, res) => {
   try {
-    const analysis = await Analysis.findById(req.params.id, 'status errorMessage');
+    const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.userId }, 'status errorMessage');
     if (!analysis) {
       return res.status(404).json({ error: '分析记录不存在' });
     }
@@ -121,10 +121,10 @@ exports.reevaluateSection = async (req, res) => {
       return res.status(400).json({ error: 'sectionType、sectionIndex、revisedText 不能为空' });
     }
 
-    const analysis = await Analysis.findById(req.params.id)
-      .populate('jdId', 'parsed');
+    const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.userId })
+      .populate({ path: 'jdId', select: 'parsed', match: { userId: req.userId } });
 
-    if (!analysis) {
+    if (!analysis || !analysis.jdId) {
       return res.status(404).json({ error: '分析记录不存在' });
     }
 

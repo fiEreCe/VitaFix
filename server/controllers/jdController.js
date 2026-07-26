@@ -12,7 +12,7 @@ exports.create = async (req, res) => {
     // AI解析JD
     const parsed = await jdParser.parse(rawText);
 
-    const jd = new JD({ rawText, parsed });
+    const jd = new JD({ userId: req.userId, rawText, parsed });
     await jd.save();
 
     res.status(201).json({ id: jd._id, parsed });
@@ -54,7 +54,7 @@ exports.ocr = async (req, res) => {
 
 exports.getById = async (req, res) => {
   try {
-    const jd = await JD.findById(req.params.id);
+    const jd = await JD.findOne({ _id: req.params.id, userId: req.userId });
     if (!jd) {
       return res.status(404).json({ error: 'JD不存在' });
     }

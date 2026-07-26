@@ -7,12 +7,12 @@ exports.upsert = async (req, res) => {
       return res.status(400).json({ error: 'resumeId不能为空' });
     }
 
-    let supplement = await Supplement.findOne({ resumeId });
+    let supplement = await Supplement.findOne({ resumeId, userId: req.userId });
     if (supplement) {
       supplement.items = items || [];
       supplement.updatedAt = new Date();
     } else {
-      supplement = new Supplement({ resumeId, items: items || [] });
+      supplement = new Supplement({ userId: req.userId, resumeId, items: items || [] });
     }
     await supplement.save();
 
@@ -24,7 +24,7 @@ exports.upsert = async (req, res) => {
 
 exports.getByResumeId = async (req, res) => {
   try {
-    const supplement = await Supplement.findOne({ resumeId: req.params.resumeId });
+    const supplement = await Supplement.findOne({ resumeId: req.params.resumeId, userId: req.userId });
     if (!supplement) {
       return res.json({ items: [] });
     }

@@ -4,14 +4,33 @@ const Resume = require('../models/Resume');
 const { AgentOrchestrator } = require('../services/agent/agentOrchestrator');
 const tools = require('../services/agent/agentToolService');
 
+async function loadOwnedInputs(jdId, resumeId, userId) {
+  const [jd, resume] = await Promise.all([
+    JD.findOne({ _id: jdId, userId }),
+    Resume.findOne({ _id: resumeId, userId }),
+  ]);
+  if (!jd || !resume) throw new Error('INPUT_NOT_FOUND');
+  return { jdText: jd.rawText, resumeText: resume.rawText };
+}
+
 function createAgentSessionController({ orchestrator, loadInputs } = {}) {
+  const persistedFields = [
+    'state', 'currentStep', 'currentTaskId', 'inputSnapshot', 'requirements',
+    'resumeFacts', 'matches', 'tasks', 'transitions', 'handoff',
+  ];
+  const persistedChanges = (value) => Object.fromEntries(persistedFields.map((key) => [key, value[key]]));
   const repository = {
     create: async (value) => new AgentSession(value).save(),
-    get: async (id, userId) => AgentSession.findOne({ _id: id, ...(userId ? { userId } : {}) }),
-    save: async (value) => value.save(),
-    claimAnalysis: async (id, { fromStates, activeStates, to, event, recoveryEvent, toolName, at, token, expiresAt }) => AgentSession.findOneAndUpdate(
+    get: async (id, userId) => AgentSession.findOne({ _id: id, userId }),
+    save: async (value, userId) => AgentSession.findOneAndUpdate(
+      { _id: value._id || value.id, userId },
+      { $set: persistedChanges(value) },
+      { new: true, runValidators: true },
+    ),
+    claimAnalysis: async (id, userId, { fromStates, activeStates, to, event, recoveryEvent, toolName, at, token, expiresAt }) => AgentSession.findOneAndUpdate(
       {
         _id: id,
+        userId,
         $or: [
           { state: { $in: fromStates } },
           {
@@ -45,9 +64,9 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
       }],
       { new: true },
     ),
-    async saveAnalysis(value, token, { clearClaim = false } = {}) {
+    async saveAnalysis(value, userId, token, { clearClaim = false } = {}) {
       const updated = await AgentSession.findOneAndUpdate(
-        { _id: value._id, analysisClaimToken: token },
+        { _id: value._id || value.id, userId, analysisClaimToken: token },
         {
           $set: {
             state: value.state,
@@ -66,38 +85,34 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
       if (!updated) throw new Error('AGENT_ANALYSIS_CLAIM_LOST');
       return updated;
     },
-    renewAnalysisClaim: async (id, token, expiresAt) => AgentSession.findOneAndUpdate(
-      { _id: id, analysisClaimToken: token },
+    renewAnalysisClaim: async (id, userId, token, expiresAt) => AgentSession.findOneAndUpdate(
+      { _id: id, userId, analysisClaimToken: token },
       { $set: { analysisClaimExpiresAt: expiresAt } },
       { new: true },
     ),
   };
   const app = orchestrator || new AgentOrchestrator({ repository, tools });
-  const getInputs = loadInputs || (async (jdId, resumeId) => {
-    const [jd, resume] = await Promise.all([JD.findById(jdId), Resume.findById(resumeId)]);
-    if (!jd || !resume) throw new Error('INPUT_NOT_FOUND');
-    return { jdText: jd.rawText, resumeText: resume.rawText };
-  });
+  const getInputs = loadInputs || loadOwnedInputs;
   const fail = (res, error) => res.status(error.message === 'AGENT_SESSION_NOT_FOUND' ? 404 : 400).json({ error: { code: error.message, message: '操作未完成，请检查输入后重试', retryable: true } });
   const ensureOwned = async (req) => { if (!await repository.get(req.params.id, req.userId)) throw new Error('AGENT_SESSION_NOT_FOUND'); };
   const command = (fn) => async (req, res) => { try { await ensureOwned(req); res.json(await fn(req)); } catch (error) { fail(res, error); } };
 
   return {
-    async create(req, res) { try { const { jdId, resumeId } = req.body || {}; if (!jdId || !resumeId) throw new Error('INPUT_REQUIRED'); const input = await getInputs(jdId, resumeId); const session = await app.createSession({ userId: req.userId, jdId, resumeId, ...input }); res.status(201).json({ id: session.id || session._id.toString(), state: session.state }); } catch (error) { fail(res, error); } },
+    async create(req, res) { try { const { jdId, resumeId } = req.body || {}; if (!jdId || !resumeId) throw new Error('INPUT_REQUIRED'); const input = await getInputs(jdId, resumeId, req.userId); const session = await app.createSession({ userId: req.userId, jdId, resumeId, ...input }); res.status(201).json({ id: session.id || session._id.toString(), state: session.state }); } catch (error) { fail(res, error); } },
     async get(req, res) { const session = await repository.get(req.params.id, req.userId); return session ? res.json(session) : res.status(404).json({ error: { code: 'AGENT_SESSION_NOT_FOUND' } }); },
-    start: command((req) => app.startAnalysis(req.params.id)),
-    selectTask: command((req) => app.selectTask(req.params.id, req.params.taskId)),
-    answer: command((req) => { if (!req.body?.answer?.trim()) throw new Error('ANSWER_REQUIRED'); return app.submitAnswer(req.params.id, req.params.taskId, req.body.answer.trim()); }),
-    reviewFact: command((req) => app.reviewFact(req.params.id, req.params.taskId, req.params.factId, req.body?.decision, req.body?.fact)),
-    generate: command((req) => app.generateCandidate(req.params.id, req.params.taskId)),
-    retry: command((req) => app.retryCurrentStep(req.params.id, req.params.taskId)),
-    validateModification: command((req) => { if (!req.body?.text?.trim()) throw new Error('TEXT_REQUIRED'); return app.validateModification(req.params.id, req.params.taskId, req.body.text); }),
-    completeWithRisk: command((req) => app.completeWithRisk(req.params.id, req.params.taskId)),
-    decide: command((req) => app.decide(req.params.id, req.params.taskId, req.body)),
-    returnControl: command((req) => app.chooseReturnControl(req.params.id, req.params.taskId, req.body?.action, req.body?.text)),
-    handoff: command((req) => app.getHandoff(req.params.id)),
+    start: command((req) => app.startAnalysis(req.params.id, req.userId)),
+    selectTask: command((req) => app.selectTask(req.params.id, req.userId, req.params.taskId)),
+    answer: command((req) => { if (!req.body?.answer?.trim()) throw new Error('ANSWER_REQUIRED'); return app.submitAnswer(req.params.id, req.userId, req.params.taskId, req.body.answer.trim()); }),
+    reviewFact: command((req) => app.reviewFact(req.params.id, req.userId, req.params.taskId, req.params.factId, req.body?.decision, req.body?.fact)),
+    generate: command((req) => app.generateCandidate(req.params.id, req.userId, req.params.taskId)),
+    retry: command((req) => app.retryCurrentStep(req.params.id, req.userId, req.params.taskId)),
+    validateModification: command((req) => { if (!req.body?.text?.trim()) throw new Error('TEXT_REQUIRED'); return app.validateModification(req.params.id, req.userId, req.params.taskId, req.body.text); }),
+    completeWithRisk: command((req) => app.completeWithRisk(req.params.id, req.userId, req.params.taskId)),
+    decide: command((req) => app.decide(req.params.id, req.userId, req.params.taskId, req.body)),
+    returnControl: command((req) => app.chooseReturnControl(req.params.id, req.userId, req.params.taskId, req.body?.action, req.body?.text)),
+    handoff: command((req) => app.getHandoff(req.params.id, req.userId)),
   };
 }
 
-module.exports = { createAgentSessionController };
+module.exports = { createAgentSessionController, loadOwnedInputs };
 module.exports.default = createAgentSessionController();
