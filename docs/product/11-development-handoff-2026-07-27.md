@@ -40,7 +40,7 @@ related_docs:
 |---|---|---|
 | PF-001 至 PF-004 代码开发 | `completed` | 三个开发批次和自动化回归均已完成 |
 | 本地质量门禁 | `passed` | 后端 114/114、PF-002 评测 42/42、前端 4/4、生产构建通过 |
-| 功能提交 | `pending` | 累计改动仍在工作区，尚未提交 |
+| 功能提交 | `completed` | `308e3e4 feat: complete PF001-PF004 logic hardening` |
 | 真实数据迁移 | `pending` | 尚未运行真实 MongoDB dry-run 和正式迁移 |
 | 发布就绪 | `blocked` | 等待迁移报告审查、索引验证和部署环境回归 |
 
@@ -52,7 +52,7 @@ related_docs:
 |---|---|
 | 工作树 | `D:\Code\VitaFix` |
 | 分支 | `main` |
-| 当前基线 HEAD | `550d934` |
+| PF-001 至 PF-004 功能基线 | `308e3e4` |
 | 设计文档 | `docs/superpowers/specs/2026-07-26-pf001-pf004-logic-hardening-design.md` |
 | 原详细计划 | `docs/superpowers/plans/2026-07-26-pf001-pf004-logic-hardening.md` |
 | 最近全量后端验证 | 114 个测试通过，0 个失败 |
@@ -273,7 +273,7 @@ Schema 使用部分唯一索引保证同一用户和 Resume 只有一个 Supplem
 
 ### 5.4 当前工作区状态
 
-PF-001 至 PF-004 的实现目前作为累计未提交改动保留在工作区，尚未创建功能提交。提交时应按实际审查范围确认文件，不要使用会覆盖工作区的 reset/checkout。
+PF-001 至 PF-004 已合并为本地提交 `308e3e4`。该提交尚未推送远程；继续开发前应先确认工作区保持干净，并从该提交继续。
 
 本次最终检查未发现 `web/package-lock.json` 修改或根目录 `package-lock.json` 未跟踪状态。
 
@@ -343,11 +343,11 @@ npm.cmd run build
 
 预期基线：
 
-- HEAD 为 `550d934` 或后续 PF-001 提交。
+- HEAD 为 `308e3e4` 或其后续提交。
 - 后端最近一次已验证为 114/114。
 - PF-002 固定评测最近一次已验证为 42/42。
 - 前端最近一次契约测试为 4/4，Vite 生产构建通过。
-- 工作区保留 PF-001 至 PF-004 的累计未提交改动。
+- PF-001 至 PF-004 已提交为 `308e3e4`，预期工作区干净。
 
 ## 8. 完成定义
 
