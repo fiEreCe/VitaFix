@@ -16,3 +16,51 @@ test('user edits warn without blocking save', () => {
   assert.equal(result.verificationStatus, 'unverified_user_content');
   assert.ok(result.findings.length > 0);
 });
+
+test('blocks responsibility expansion synonyms and unrelated claims', () => {
+  const result = verifyCandidate({
+    text: '牵头制定公司战略并推动营收增长',
+    factRefs: ['fact-1'],
+  }, [{
+    id: 'fact-1',
+    confirmation: 'confirmed',
+    sourceText: '参与用户访谈并整理反馈',
+    contribution: '团队共同完成',
+  }]);
+
+  assert.equal(result.status, 'unsupported');
+  assert.ok(result.findings.some((item) => item.type === 'attribution_expansion'));
+  assert.ok(result.findings.some((item) => item.type === 'unsupported_claim_semantics'));
+});
+
+test('does not reuse a people count as a revenue percentage', () => {
+  const result = verifyCandidate({
+    text: '实现营收增长20%',
+    factRefs: ['fact-1'],
+  }, [{
+    id: 'fact-1',
+    confirmation: 'confirmed',
+    sourceText: '访谈20位用户',
+    quantity: '20位用户',
+    quantityType: 'exact',
+  }]);
+
+  assert.equal(result.status, 'unsupported');
+  assert.ok(result.findings.some((item) => item.type === 'number_context_expansion'));
+});
+
+test('allows a confirmed number when unit and purpose remain consistent', () => {
+  const result = verifyCandidate({
+    text: '访谈20位用户并整理反馈',
+    factRefs: ['fact-1'],
+  }, [{
+    id: 'fact-1',
+    confirmation: 'confirmed',
+    sourceText: '访谈20位用户并整理反馈',
+    quantity: '20位用户',
+    quantityType: 'exact',
+  }]);
+
+  assert.equal(result.status, 'passed');
+  assert.ok(!result.findings.some((item) => item.type === 'number_context_expansion'));
+});

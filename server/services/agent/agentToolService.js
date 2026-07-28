@@ -1,10 +1,33 @@
 const jdParser = require('../jdParser');
 const resumeParser = require('../resumeParser');
+const deepseekService = require('../deepseekService');
 const auditService = require('./agentAuditService');
+const skillSynonyms = require('../../data/skill-synonyms.json');
+const { validateToolResult } = require('../../domain/agent/contracts');
+const { evidenceOverlap, normalizeText } = require('../../domain/agent/textEvidence');
+const {
+  ASSESS_ANSWER_PROMPT,
+  MODIFICATION_VALIDATION_PROMPT,
+} = require('../../utils/promptTemplates');
 
-const words = (value) => new Set(String(value || '').toLowerCase().match(/[\u4e00-\u9fa5]{2,}|[a-z]+/g) || []);
+const synonymGroups = Object.entries(skillSynonyms)
+  .filter(([key, values]) => !key.startsWith('_') && Array.isArray(values))
+  .map(([key, values]) => [key, ...values].map(normalizeText).filter(Boolean));
+
+function hasSynonymMatch(left, right) {
+  const leftText = normalizeText(left);
+  const rightText = normalizeText(right);
+  return synonymGroups.some((group) => (
+    group.some((term) => leftText.includes(term))
+    && group.some((term) => rightText.includes(term))
+  ));
+}
 
 class AgentToolService {
+  constructor({ ai = deepseekService } = {}) {
+    this.ai = ai;
+  }
+
   async parseJD(rawText) {
     const parsed = await jdParser.parse(rawText);
     const requirements = [...(parsed.requirements || []), ...(parsed.responsibilities || [])].map((sourceText, index) => ({ id: `req-${index + 1}`, sourceText, priority: 100 - index }));
@@ -21,10 +44,26 @@ class AgentToolService {
   }
   async matchEvidence({ requirements, facts }) {
     return { matches: requirements.map((requirement) => {
-      const reqWords = words(requirement.sourceText);
-      const matched = facts.filter((fact) => [...reqWords].some((word) => fact.sourceText.toLowerCase().includes(word))).map((fact) => fact.id);
+      const matched = facts.filter((fact) => (
+        evidenceOverlap(requirement.sourceText, fact.sourceText) >= 0.25
+        || hasSynonymMatch(requirement.sourceText, fact.sourceText)
+      )).map((fact) => fact.id);
       return { requirementId: requirement.id, factIds: matched, gapType: matched.length ? 'expression' : 'information', priority: requirement.priority };
     }) };
+  }
+  async assessAnswer(input) {
+    const result = await this.ai.chatJSON(ASSESS_ANSWER_PROMPT(input), {
+      temperature: 0,
+      maxTokens: 1000,
+    });
+    return validateToolResult('assessAnswer', result);
+  }
+  async evaluateModification(input) {
+    const result = await this.ai.chatJSON(MODIFICATION_VALIDATION_PROMPT(input), {
+      temperature: 0,
+      maxTokens: 1600,
+    });
+    return validateToolResult('evaluateModification', result);
   }
   async draftRevision({ requirement, facts, sufficiency }) {
     const fact = facts[0];
@@ -37,3 +76,4 @@ class AgentToolService {
   async verifyRevision(input) { return auditService.verifyRevision(input); }
 }
 module.exports = new AgentToolService();
+module.exports.AgentToolService = AgentToolService;

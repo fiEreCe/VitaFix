@@ -10,6 +10,12 @@ function harness({ draft, facts, matches } = {}) {
     parseJD: async () => ({ requirements: [{ id: 'r1', sourceText: '用户研究', priority: 10 }, { id: 'r2', sourceText: '沟通', priority: 9 }] }),
     parseResume: async () => ({ facts: baseFacts }),
     matchEvidence: async () => ({ matches: matches || [{ requirementId: 'r1', factIds: ['f1'], gapType: 'expression', priority: 10 }] }),
+    assessAnswer: async ({ answer }) => ({
+      quality: 'partial',
+      factPatch: { action: answer },
+      missingFields: ['context', 'contribution'],
+      questionHint: '这项工作服务什么场景，其中由你负责什么？',
+    }),
     draftRevision: draft || (async () => ({ text: '参与用户访谈', factRefs: ['f1'] })),
   } });
   return { app, repository };

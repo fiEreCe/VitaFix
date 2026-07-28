@@ -4,6 +4,20 @@ function calculateSufficiency(fact = {}) {
   return fact.method || fact.result ? 'strong' : 'basic';
 }
 
+const FACT_FIELDS = Object.freeze([
+  'action', 'context', 'contribution', 'method', 'result', 'quantity', 'quantityType',
+]);
+
+function mergeFacts(facts = []) {
+  return facts.reduce((merged, fact) => {
+    FACT_FIELDS.forEach((field) => {
+      const value = fact?.[field];
+      if (value !== undefined && value !== null && value !== '') merged[field] = value;
+    });
+    return merged;
+  }, {});
+}
+
 function applyAnswerQuality(turn, quality) {
   if (quality === 'off_topic') {
     return turn.clarificationUsed
@@ -27,4 +41,11 @@ function nextInsufficientAction({ effectiveRounds, sufficiency }) {
   return effectiveRounds >= 3 ? 'return_control' : 'question';
 }
 
-module.exports = { calculateSufficiency, applyAnswerQuality, classifyGap, nextInsufficientAction };
+module.exports = {
+  FACT_FIELDS,
+  applyAnswerQuality,
+  calculateSufficiency,
+  classifyGap,
+  mergeFacts,
+  nextInsufficientAction,
+};

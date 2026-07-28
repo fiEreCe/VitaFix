@@ -1,12 +1,13 @@
 const JD = require('../models/JD');
 const jdParser = require('../services/jdParser');
 const ocrService = require('../services/ocrService');
+const { publicError, sendError } = require('../utils/appError');
 
 exports.create = async (req, res) => {
   try {
     const { rawText } = req.body;
     if (!rawText) {
-      return res.status(400).json({ error: 'JD文本不能为空' });
+      return sendError(res, publicError('JD_TEXT_REQUIRED', 'JD 文本不能为空'));
     }
 
     // AI解析JD
@@ -18,7 +19,7 @@ exports.create = async (req, res) => {
     res.status(201).json({ id: jd._id, parsed });
   } catch (error) {
     console.error('JD解析失败:', error);
-    res.status(500).json({ error: 'JD解析失败: ' + error.message });
+    sendError(res, error);
   }
 };
 
@@ -29,26 +30,26 @@ exports.create = async (req, res) => {
 exports.ocr = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: '请上传图片' });
+      return sendError(res, publicError('IMAGE_REQUIRED', '请上传图片'));
     }
 
     const imageBuffer = req.file.buffer;
     const mimeType = req.file.mimetype;
 
     if (!mimeType.startsWith('image/')) {
-      return res.status(400).json({ error: '仅支持图片格式（JPG/PNG）' });
+      return sendError(res, publicError('INVALID_IMAGE_TYPE', '仅支持图片格式（JPG/PNG）'));
     }
 
     // 仅 OCR 提取文字
     const rawText = await ocrService.extractText(imageBuffer, mimeType);
     if (!rawText || rawText.trim().length === 0) {
-      return res.status(400).json({ error: '未从图片中识别出文字，请确认图片清晰' });
+      return sendError(res, publicError('OCR_TEXT_NOT_FOUND', '未从图片中识别出文字，请确认图片清晰'));
     }
 
     res.json({ rawText });
   } catch (error) {
     console.error('OCR识别失败:', error);
-    res.status(500).json({ error: 'OCR识别失败: ' + error.message });
+    sendError(res, error);
   }
 };
 
@@ -56,10 +57,10 @@ exports.getById = async (req, res) => {
   try {
     const jd = await JD.findOne({ _id: req.params.id, userId: req.userId });
     if (!jd) {
-      return res.status(404).json({ error: 'JD不存在' });
+      return sendError(res, publicError('JD_NOT_FOUND', 'JD 不存在或无权访问', { status: 404 }));
     }
     res.json(jd);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    sendError(res, error);
   }
 };

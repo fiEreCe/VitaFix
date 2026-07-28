@@ -1,8 +1,8 @@
 const { verifyCandidate } = require('../../domain/agent/guardrails');
 
-const RULE_VERSION = 'pf002-rules-1';
-const SCHEMA_VERSION = 'pf002-schema-1';
-const evaluationVersion = () => ({ ruleVersion: RULE_VERSION, schemaVersion: SCHEMA_VERSION, modelVersion: process.env.AI_MODEL || 'deepseek-chat', promptVersion: 'pf001-agent-prompt-1', codeVersion: process.env.GIT_COMMIT || 'local' });
+const RULE_VERSION = 'pf002-rules-2';
+const SCHEMA_VERSION = 'pf002-schema-2';
+const evaluationVersion = () => ({ ruleVersion: RULE_VERSION, schemaVersion: SCHEMA_VERSION, modelVersion: process.env.AI_MODEL || 'deepseek-chat', promptVersion: 'pf002-audit-prompt-1', codeVersion: process.env.GIT_COMMIT || 'local' });
 
 function evaluateCandidate(candidate, facts) {
   try {
@@ -20,4 +20,10 @@ function runCases(cases) {
   });
   return { generatedAt: new Date().toISOString(), ruleVersion: RULE_VERSION, schemaVersion: SCHEMA_VERSION, total: results.length, passed: results.filter((item) => item.pass).length, failed: results.filter((item) => !item.pass).length, results };
 }
-module.exports = { RULE_VERSION, SCHEMA_VERSION, evaluateCandidate, runCases };
+module.exports = {
+  RULE_VERSION,
+  SCHEMA_VERSION,
+  evaluateCandidate,
+  evaluationVersion,
+  runCases,
+};

@@ -8,6 +8,10 @@
 
 const ANALYTICS_KEY = 'jingzhu_visitor_id'
 
+export function shouldTrackPage(pageName) {
+  return pageName !== 'GuidedDemo'
+}
+
 function getVisitorId() {
   let id = localStorage.getItem(ANALYTICS_KEY)
   if (!id) {

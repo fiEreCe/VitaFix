@@ -39,8 +39,38 @@ function validateToolResult(toolName, value) {
       assertEnum(match.gapType, GAP_TYPES, 'INVALID_GAP_TYPE');
     });
   }
-  if (toolName === 'assessAnswer') assertEnum(value.quality, ANSWER_QUALITIES, 'INVALID_ANSWER_QUALITY');
-  if (toolName === 'verifyRevision') assertEnum(value.status, VERIFICATION_RESULTS, 'INVALID_VERIFICATION_STATUS');
+  if (toolName === 'assessAnswer') {
+    assertEnum(value.quality, ANSWER_QUALITIES, 'INVALID_ANSWER_QUALITY');
+    if (
+      !value.factPatch
+      || typeof value.factPatch !== 'object'
+      || Array.isArray(value.factPatch)
+      || !Array.isArray(value.missingFields)
+      || typeof value.questionHint !== 'string'
+    ) fail('INVALID_ANSWER_SCHEMA');
+  }
+  if (toolName === 'verifyRevision') {
+    assertEnum(value.status, VERIFICATION_RESULTS, 'INVALID_VERIFICATION_STATUS');
+    if (
+      !Array.isArray(value.findings)
+      || !Array.isArray(value.supportedClaims)
+      || !Array.isArray(value.unsupportedClaims)
+      || !Array.isArray(value.factRefs)
+    ) fail('INVALID_VERIFICATION_SCHEMA');
+  }
+  if (toolName === 'evaluateModification') {
+    assertEnum(value.relevance, ['improved', 'unchanged', 'regressed'], 'INVALID_MODIFICATION_RELEVANCE');
+    assertEnum(value.quality, ['improved', 'unchanged', 'regressed'], 'INVALID_MODIFICATION_QUALITY');
+    assertEnum(value.safetyStatus, ['passed', 'warning', 'blocked', 'unavailable'], 'INVALID_MODIFICATION_SAFETY');
+    if (
+      !Array.isArray(value.beforeFactRefs)
+      || !Array.isArray(value.afterFactRefs)
+      || !Array.isArray(value.improvements)
+      || !Array.isArray(value.remainingIssues)
+      || !Array.isArray(value.nextActions)
+      || !Array.isArray(value.safetyFindings)
+    ) fail('INVALID_MODIFICATION_SCHEMA');
+  }
   if (toolName === 'draftRevision' && (!value.text || !Array.isArray(value.factRefs))) fail('INVALID_DRAFT_SCHEMA');
   return value;
 }

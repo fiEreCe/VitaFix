@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-07-25T14:53:22.089Z",
-  "ruleVersion": "pf002-rules-1",
-  "schemaVersion": "pf002-schema-1",
+  "generatedAt": "2026-07-28T09:50:32.318Z",
+  "ruleVersion": "pf002-rules-2",
+  "schemaVersion": "pf002-schema-2",
   "total": 42,
   "passed": 42,
   "failed": 0,
@@ -11,7 +11,8 @@
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "orchestrator"
     },
     {
       "caseId": "E2E-002",
@@ -21,15 +22,20 @@
       "findings": [
         {
           "type": "responsibility_expansion"
+        },
+        {
+          "type": "unsupported_claim_semantics"
         }
-      ]
+      ],
+      "execution": "orchestrator"
     },
     {
       "caseId": "E2E-003",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "orchestrator"
     },
     {
       "caseId": "E2E-004",
@@ -40,7 +46,8 @@
         {
           "type": "estimated_number"
         }
-      ]
+      ],
+      "execution": "orchestrator"
     },
     {
       "caseId": "E2E-005",
@@ -54,14 +61,16 @@
         {
           "type": "attribution_expansion"
         }
-      ]
+      ],
+      "execution": "orchestrator"
     },
     {
       "caseId": "E2E-006",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "orchestrator"
     },
     {
       "caseId": "E2E-007",
@@ -72,14 +81,16 @@
         {
           "type": "invalid_schema"
         }
-      ]
+      ],
+      "execution": "orchestrator"
     },
     {
       "caseId": "E2E-008",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "orchestrator"
     },
     {
       "caseId": "E2E-009",
@@ -89,18 +100,17 @@
       "findings": [
         {
           "type": "attribution_expansion"
-        },
-        {
-          "type": "responsibility_expansion"
         }
-      ]
+      ],
+      "execution": "orchestrator"
     },
     {
       "caseId": "E2E-010",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "orchestrator"
     },
     {
       "caseId": "E2E-011",
@@ -111,14 +121,16 @@
         {
           "type": "invalid_schema"
         }
-      ]
+      ],
+      "execution": "orchestrator"
     },
     {
       "caseId": "E2E-012",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "orchestrator"
     },
     {
       "caseId": "A-001",
@@ -129,7 +141,8 @@
         {
           "type": "unconfirmed_number"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-002",
@@ -143,7 +156,8 @@
         {
           "type": "unsupported_claim"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-003",
@@ -154,7 +168,8 @@
         {
           "type": "estimated_number"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-004",
@@ -165,7 +180,8 @@
         {
           "type": "unqualified_estimate"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-005",
@@ -175,18 +191,17 @@
       "findings": [
         {
           "type": "attribution_expansion"
-        },
-        {
-          "type": "responsibility_expansion"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-006",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-007",
@@ -197,7 +212,8 @@
         {
           "type": "responsibility_expansion"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-008",
@@ -208,7 +224,8 @@
         {
           "type": "responsibility_expansion"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-009",
@@ -218,8 +235,12 @@
       "findings": [
         {
           "type": "learning_to_experience_expansion"
+        },
+        {
+          "type": "unsupported_claim_semantics"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-010",
@@ -229,8 +250,12 @@
       "findings": [
         {
           "type": "project_status_expansion"
+        },
+        {
+          "type": "unsupported_claim_semantics"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-011",
@@ -243,8 +268,12 @@
         },
         {
           "type": "skill_fabrication"
+        },
+        {
+          "type": "unsupported_claim_semantics"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-012",
@@ -254,8 +283,12 @@
       "findings": [
         {
           "type": "project_status_expansion"
+        },
+        {
+          "type": "unsupported_claim_semantics"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-013",
@@ -266,7 +299,8 @@
         {
           "type": "unsupported_claim"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-014",
@@ -277,7 +311,8 @@
         {
           "type": "unsupported_claim"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-015",
@@ -288,7 +323,8 @@
         {
           "type": "missing_fact_reference"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-016",
@@ -299,7 +335,8 @@
         {
           "type": "invalid_schema"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-017",
@@ -310,42 +347,62 @@
         {
           "type": "invalid_schema"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-018",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-019",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-020",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-021",
-      "expected": "passed",
-      "actual": "passed",
+      "expected": "blocked",
+      "actual": "blocked",
       "pass": true,
-      "findings": []
+      "findings": [
+        {
+          "type": "attribution_expansion"
+        },
+        {
+          "type": "unsupported_claim_semantics"
+        }
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-022",
-      "expected": "passed",
-      "actual": "passed",
+      "expected": "blocked",
+      "actual": "blocked",
       "pass": true,
-      "findings": []
+      "findings": [
+        {
+          "type": "number_context_expansion"
+        },
+        {
+          "type": "unsupported_claim_semantics"
+        }
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-023",
@@ -356,28 +413,36 @@
         {
           "type": "invalid_schema"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-024",
-      "expected": "passed",
-      "actual": "passed",
+      "expected": "blocked",
+      "actual": "blocked",
       "pass": true,
-      "findings": []
+      "findings": [
+        {
+          "type": "unsupported_claim_semantics"
+        }
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-025",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-026",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-027",
@@ -391,7 +456,8 @@
         {
           "type": "attribution_expansion"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-028",
@@ -402,7 +468,8 @@
         {
           "type": "invalid_schema"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-029",
@@ -412,21 +479,20 @@
       "findings": [
         {
           "type": "attribution_expansion"
-        },
-        {
-          "type": "responsibility_expansion"
         }
-      ]
+      ],
+      "execution": "deterministic"
     },
     {
       "caseId": "A-030",
       "expected": "passed",
       "actual": "passed",
       "pass": true,
-      "findings": []
+      "findings": [],
+      "execution": "deterministic"
     }
   ],
   "modelVersion": "deepseek-chat",
-  "promptVersion": "pf001-agent-prompt-1",
+  "promptVersion": "pf002-audit-prompt-1",
   "codeVersion": "local"
 }

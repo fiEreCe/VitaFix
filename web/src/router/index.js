@@ -1,5 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import { events } from '../utils/analytics'
+import { events, shouldTrackPage } from '../utils/analytics'
 
 const routes = [
   {
@@ -48,7 +48,7 @@ const router = createRouter({
 // 页面访问埋点
 router.afterEach((to) => {
   const pageName = to.name || to.path
-  events.pageView(pageName)
+  if (shouldTrackPage(pageName)) events.pageView(pageName)
 })
 
 export default router

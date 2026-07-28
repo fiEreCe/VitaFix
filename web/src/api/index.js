@@ -2,7 +2,20 @@
  * API 请求封装
  */
 const BASE_URL = '/api'
-import { getDeviceId } from '../utils/id'
+import { getDeviceId } from '../utils/id.js'
+
+export function readError(payload, status) {
+  const value = payload?.error
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const error = new Error(
+      typeof value.message === 'string' && value.message ? value.message : `HTTP ${status}`,
+    )
+    if (typeof value.code === 'string') error.code = value.code
+    error.retryable = Boolean(value.retryable)
+    return error
+  }
+  return new Error(typeof value === 'string' && value ? value : `HTTP ${status}`)
+}
 
 /** 获取用户标识头 */
 function userIdHeader() {
@@ -40,8 +53,8 @@ async function request(url, options = {}) {
     const response = await fetch(`${BASE_URL}${url}${queryString}`, fetchOptions)
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: '请求失败' }))
-      throw new Error(err.error || `HTTP ${response.status}`)
+      const err = await response.json().catch(() => ({}))
+      throw readError(err, response.status)
     }
 
     return await response.json()
@@ -59,8 +72,8 @@ async function upload(url, formData) {
     body: formData,
   })
   if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: '上传失败' }))
-    throw new Error(err.error || `HTTP ${response.status}`)
+    const err = await response.json().catch(() => ({}))
+    throw readError(err, response.status)
   }
   return response.json()
 }

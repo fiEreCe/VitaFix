@@ -15,5 +15,19 @@ test('blocks an estimated number when its qualifier is removed', () => {
   const result = evaluateCandidate({ text: '参与20位用户访谈', factRefs: ['f1'] }, [{ id: 'f1', confirmation: 'confirmed', quantity: '20', quantityType: 'estimated' }]);
   assert.equal(result.status, 'blocked');
   assert.ok(result.findings.some((item) => item.type === 'unqualified_estimate'));
-  assert.equal(result.evaluationVersion.ruleVersion, 'pf002-rules-1');
+  assert.equal(result.evaluationVersion.ruleVersion, 'pf002-rules-2');
+});
+
+test('blocks a semantically unrelated claim with valid fact references', () => {
+  const result = evaluateCandidate({
+    text: '建立商业化增长体系',
+    factRefs: ['f1'],
+  }, [{
+    id: 'f1',
+    confirmation: 'confirmed',
+    sourceText: '参与用户访谈并整理反馈',
+  }]);
+
+  assert.equal(result.status, 'blocked');
+  assert.ok(result.findings.some((item) => item.type === 'unsupported_claim_semantics'));
 });

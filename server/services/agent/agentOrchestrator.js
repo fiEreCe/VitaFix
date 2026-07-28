@@ -1,5 +1,10 @@
 const crypto = require('crypto');
-const { calculateSufficiency } = require('../../domain/agent/policy');
+const {
+  applyAnswerQuality,
+  calculateSufficiency,
+  mergeFacts,
+  nextInsufficientAction,
+} = require('../../domain/agent/policy');
 const { inspectUserEdit } = require('../../domain/agent/guardrails');
 const { evaluateCandidate } = require('./pf002Evaluator');
 const { validate } = require('./modificationValidator');
@@ -102,8 +107,12 @@ class AgentOrchestrator {
   async selectTask(id, userId, taskId) {
     const session = await this._get(id, userId); const task = this._task(session, taskId);
     session.currentTaskId = taskId;
-    const facts = this._factsForTask(session, task);
-    task.sufficiency = facts.length ? calculateSufficiency(facts[0]) : 'insufficient';
+    const facts = this._confirmedFactsForTask(session, task);
+    task.sufficiency = facts.length ? calculateSufficiency(mergeFacts(facts)) : 'insufficient';
+    if (task.sufficiency === 'insufficient') {
+      task.currentQuestion = task.currentQuestion || this._fallbackQuestion();
+      task.questionTarget = task.questionTarget || 'action';
+    }
     this._transition(session, task, task.sufficiency === 'insufficient' ? 'questioning' : 'generating', 'TASK_SELECTED');
     this._transition(session, null, 'task_in_progress', 'TASK_SELECTED');
     return this.repository.save(session, userId);
@@ -111,8 +120,8 @@ class AgentOrchestrator {
 
   async generateCandidate(id, userId, taskId) {
     const session = await this._get(id, userId); const task = this._task(session, taskId);
-    const facts = this._factsForTask(session, task).filter((fact) => ['confirmed', 'corrected'].includes(fact.confirmation));
-    task.sufficiency = facts.length ? calculateSufficiency(facts[0]) : 'insufficient';
+    const facts = this._confirmedFactsForTask(session, task);
+    task.sufficiency = facts.length ? calculateSufficiency(mergeFacts(facts)) : 'insufficient';
     if (task.sufficiency === 'insufficient') {
       this._transition(session, task, 'questioning', 'INSUFFICIENT_EVIDENCE');
       return this.repository.save(session, userId);
@@ -129,7 +138,10 @@ class AgentOrchestrator {
     let candidate = await draft();
     let verification = await audit(candidate);
     task.evaluationRetryAttempts = 0;
-    if (verification.status === 'unavailable') {
+    const semanticAuditUnavailable = () => verification.findings?.some(
+      (finding) => finding.type === 'semantic_audit_unavailable',
+    );
+    if (verification.status === 'unavailable' && !semanticAuditUnavailable()) {
       task.evaluationRetryAttempts = 1;
       candidate = await draft();
       verification = await audit(candidate);
@@ -158,6 +170,13 @@ class AgentOrchestrator {
     }
     if (['不记得', '无法证明'].includes(answer)) {
       task.effectiveRounds += 1;
+      task.lastAnswerAssessment = {
+        quality: 'unknown',
+        factPatch: {},
+        missingFields: [task.questionTarget || 'action'],
+        questionHint: task.currentQuestion || this._fallbackQuestion(),
+      };
+      task.currentQuestion = this._nextQuestion(task.lastAnswerAssessment);
       this._transition(session, task, task.effectiveRounds >= 3 ? 'return_control' : 'questioning', 'ANSWER_SUBMITTED');
       return this.repository.save(session, userId);
     }
@@ -166,8 +185,72 @@ class AgentOrchestrator {
       this._transition(session, task, 'capability_gap', 'ANSWER_SUBMITTED');
       return this.repository.save(session, userId);
     }
-    const fact = { id: `fact-${session.resumeFacts.length + 1}`, sourceText: answer, action: answer, context: '', contribution: '', method: '', result: '', quantity: '', confirmation: 'pending_confirmation' };
-    session.resumeFacts.push(fact); task.factIds.push(fact.id); task.effectiveRounds += 1; task.pendingFactId = fact.id;
+
+    let assessment;
+    try {
+      assessment = await this.tools.assessAnswer({
+        requirement: session.requirements.find((item) => item.id === task.requirementId),
+        confirmedFact: mergeFacts(this._confirmedFactsForTask(session, task)),
+        question: task.currentQuestion || this._fallbackQuestion(),
+        answer,
+      });
+    } catch (error) {
+      task.pendingAnswer = answer;
+      task.lastAnswerAssessment = {
+        quality: 'unknown',
+        factPatch: {},
+        missingFields: [],
+        questionHint: task.currentQuestion || this._fallbackQuestion(),
+        error: error.message,
+      };
+      this._transition(session, task, 'question_failed', 'ANSWER_ASSESSMENT_FAILED', 'assessAnswer');
+      return this.repository.save(session, userId);
+    }
+
+    task.pendingAnswer = '';
+    task.lastAnswerAssessment = assessment;
+    const turn = applyAnswerQuality(task, assessment.quality);
+    task.effectiveRounds = turn.effectiveRounds;
+    task.clarificationUsed = Boolean(turn.clarificationUsed);
+    task.currentQuestion = this._nextQuestion(assessment);
+    task.questionTarget = assessment.missingFields?.[0] || '';
+
+    if (assessment.quality === 'off_topic') {
+      this._transition(
+        session,
+        task,
+        turn.next === 'return_control' ? 'return_control' : 'questioning',
+        'ANSWER_ASSESSED',
+        'assessAnswer',
+      );
+      return this.repository.save(session, userId);
+    }
+    if (assessment.quality === 'not_done') {
+      task.gapType = 'capability';
+      this._transition(session, task, 'capability_gap', 'ANSWER_ASSESSED', 'assessAnswer');
+      return this.repository.save(session, userId);
+    }
+    if (['unknown', 'contradictory'].includes(assessment.quality)) {
+      const nextState = task.effectiveRounds >= 3 ? 'return_control' : 'questioning';
+      this._transition(session, task, nextState, 'ANSWER_ASSESSED', 'assessAnswer');
+      return this.repository.save(session, userId);
+    }
+
+    const confirmedFacts = this._confirmedFactsForTask(session, task);
+    const baseFact = confirmedFacts.at(-1);
+    const merged = { ...mergeFacts(confirmedFacts), ...this._nonEmptyPatch(assessment.factPatch) };
+    const fact = {
+      id: `fact-${session.resumeFacts.length + 1}`,
+      sourceText: [baseFact?.sourceText, answer].filter(Boolean).join('\n'),
+      action: '', context: '', contribution: '', method: '', result: '', quantity: '',
+      quantityType: 'exact',
+      ...merged,
+      confirmation: 'pending_confirmation',
+    };
+    session.resumeFacts.push(fact);
+    task.factIds.push(fact.id);
+    task.pendingFactId = fact.id;
+    task.pendingBaseFactId = baseFact?.id || '';
     this._transition(session, task, 'awaiting_fact_confirmation', 'ANSWER_SUBMITTED');
     return this.repository.save(session, userId);
   }
@@ -179,7 +262,38 @@ class AgentOrchestrator {
     else if (decision === 'confirm') fact.confirmation = 'confirmed';
     else if (decision === 'reject') fact.confirmation = 'rejected';
     else throw new Error('INVALID_FACT_DECISION');
-    this._transition(session, task, decision === 'reject' ? 'questioning' : 'generating', 'FACT_REVIEWED');
+
+    if (decision === 'reject') {
+      task.factIds = task.factIds.filter((id) => id !== fact.id);
+    } else if (task.pendingBaseFactId) {
+      const baseFact = session.resumeFacts.find((item) => item.id === task.pendingBaseFactId);
+      if (baseFact) baseFact.confirmation = 'rejected';
+      task.factIds = task.factIds.filter((id) => id !== task.pendingBaseFactId);
+    }
+
+    task.pendingFactId = '';
+    task.pendingBaseFactId = '';
+    const confirmedFacts = this._confirmedFactsForTask(session, task);
+    task.sufficiency = confirmedFacts.length
+      ? calculateSufficiency(mergeFacts(confirmedFacts))
+      : 'insufficient';
+    const action = decision === 'reject'
+      ? 'question'
+      : nextInsufficientAction({
+        effectiveRounds: task.effectiveRounds,
+        sufficiency: task.sufficiency,
+      });
+    const nextState = action === 'generate'
+      ? 'generating'
+      : action === 'return_control' ? 'return_control' : 'questioning';
+    if (task.sufficiency !== 'insufficient') task.gapType = 'expression';
+    if (nextState === 'questioning') {
+      task.currentQuestion = this._nextQuestion(task.lastAnswerAssessment);
+    } else if (nextState === 'generating') {
+      task.currentQuestion = '';
+      task.questionTarget = '';
+    }
+    this._transition(session, task, nextState, 'FACT_REVIEWED');
     return this.repository.save(session, userId);
   }
 
@@ -187,8 +301,23 @@ class AgentOrchestrator {
     const session = await this._get(id, userId); const task = this._task(session, taskId);
     let nextState;
     if (decision.type === 'user_edited') {
-      task.validationBaseline = task.validationBaseline || task.candidate?.text || this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n');
-      task.candidate = { text: decision.text, contentSource: 'user_edited', verification: inspectUserEdit(decision.text, this._factsForTask(session, task)) };
+      const originalText = this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n');
+      const previousText = task.currentText || task.candidate?.text || originalText;
+      const inspection = inspectUserEdit(decision.text, this._factsForTask(session, task));
+      task.initialText = task.initialText || originalText;
+      task.validationBaseline = previousText;
+      task.currentText = decision.text;
+      task.riskAcknowledged = false;
+      task.candidate = {
+        ...(task.candidate || {}),
+        text: decision.text,
+        factRefs: task.candidate?.factRefs || task.factIds,
+        contentSource: 'user_edited',
+        verification: {
+          ...inspection,
+          status: 'unverified_user_content',
+        },
+      };
       nextState = 'user_edited';
     } else {
       if (!['accepted', 'rejected', 'skipped'].includes(decision.type)) throw new Error('INVALID_DECISION');
@@ -196,10 +325,26 @@ class AgentOrchestrator {
       nextState = decision.type;
     }
     if (!['accepted', 'rejected', 'skipped', 'user_edited'].includes(nextState)) throw new Error('INVALID_DECISION');
+    if (nextState === 'accepted') {
+      task.currentText = task.candidate?.text || '';
+      task.riskAcknowledged = false;
+    }
     this._transition(session, task, nextState, 'USER_DECISION');
     if (['accepted', 'user_edited'].includes(nextState)) {
-      session.handoff = { taskId, originalText: this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n'), finalText: task.candidate?.text || '', factRefs: task.candidate?.factRefs || task.factIds, contentSource: task.candidate?.contentSource || 'ai_generated', verificationStatus: task.candidate?.verification?.status || 'unavailable', riskAcknowledged: Boolean(decision.riskAcknowledged) };
-      this._transition(session, null, 'ready_for_reevaluation', 'USER_DECISION');
+      const verificationStatus = nextState === 'user_edited'
+        ? 'unverified_user_content'
+        : task.candidate?.verification?.status || 'unavailable';
+      session.handoff = this._buildHandoff(session, task, {
+        finalText: task.candidate?.text || '',
+        verificationStatus,
+        contentSource: task.candidate?.contentSource || 'ai_generated',
+      });
+      this._transition(
+        session,
+        null,
+        nextState === 'accepted' ? 'ready_for_reevaluation' : 'task_in_progress',
+        'USER_DECISION',
+      );
     }
     return this.repository.save(session, userId);
   }
@@ -219,24 +364,81 @@ class AgentOrchestrator {
   async validateModification(id, userId, taskId, currentText) {
     const session = await this._get(id, userId); const task = this._task(session, taskId);
     const baselineText = task.validationBaseline || task.candidate?.text || this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n');
-    const record = validate({ baselineText, currentText, facts: this._factsForTask(session, task), factRefs: task.candidate?.factRefs || task.factIds, semanticJudge: this.tools.evaluateModification });
-    task.validationRecords = [...(task.validationRecords || []), record]; task.validationBaseline = currentText; task.currentText = currentText;
-    this._transition(session, task, record.safetyStatus === 'blocked' ? 'user_edited' : 'ready_for_reevaluation', 'MODIFICATION_VALIDATED', 'evaluateModification');
+    const facts = this._confirmedFactsForTask(session, task);
+    const factRefs = task.candidate?.factRefs || task.factIds;
+    const requirement = session.requirements.find((item) => item.id === task.requirementId);
+    const record = await validate({
+      baselineText,
+      currentText,
+      facts,
+      factRefs,
+      requirement,
+      semanticJudge: typeof this.tools.evaluateModification === 'function'
+        ? (input) => this.tools.evaluateModification(input)
+        : undefined,
+    });
+    task.validationRecords = [...(task.validationRecords || []), record];
+    task.currentText = currentText;
+    task.riskAcknowledged = false;
+    task.candidate = {
+      ...(task.candidate || {}),
+      text: currentText,
+      factRefs,
+      contentSource: 'user_edited',
+      verification: {
+        status: record.safetyStatus,
+        findings: record.remainingIssues,
+        evaluationVersion: record.evaluationVersion,
+      },
+    };
+    if (record.safetyStatus !== 'unavailable') task.validationBaseline = currentText;
+    const verified = ['passed', 'warning'].includes(record.safetyStatus);
+    this._transition(session, task, verified ? 'ready_for_reevaluation' : 'user_edited', 'MODIFICATION_VALIDATED', 'evaluateModification');
+    this._transition(session, null, verified ? 'ready_for_reevaluation' : 'task_in_progress', 'MODIFICATION_VALIDATED', 'evaluateModification');
+    session.handoff = this._buildHandoff(session, task, {
+      finalText: currentText,
+      verificationStatus: record.safetyStatus,
+      contentSource: 'user_edited',
+    });
     return this.repository.save(session, userId);
   }
 
   async completeWithRisk(id, userId, taskId) {
     const session = await this._get(id, userId); const task = this._task(session, taskId); const latest = task.validationRecords?.at(-1);
     if (latest?.safetyStatus !== 'blocked') throw new Error('RISK_ACKNOWLEDGEMENT_NOT_AVAILABLE');
+    task.riskAcknowledged = true;
+    const finalText = task.currentText || task.candidate?.text || '';
+    session.handoff = this._buildHandoff(session, task, {
+      finalText,
+      verificationStatus: 'blocked',
+      riskAcknowledged: true,
+      contentSource: 'user_edited',
+    });
     this._transition(session, task, 'completed_with_risk', 'RISK_ACKNOWLEDGED');
+    this._transition(session, null, 'ready_for_reevaluation', 'RISK_ACKNOWLEDGED');
     return this.repository.save(session, userId);
   }
 
   async retryCurrentStep(id, userId, taskId) {
     const session = await this._get(id, userId); const task = this._task(session, taskId);
-    if (!['generation_failed', 'verification_failed'].includes(task.state)) throw new Error('TASK_NOT_RETRYABLE');
+    if (!['question_failed', 'generation_failed', 'verification_failed'].includes(task.state)) throw new Error('TASK_NOT_RETRYABLE');
     if ((task.retryCount || 0) >= 3) throw new Error('TASK_RETRY_LIMIT_REACHED');
     task.retryCount = (task.retryCount || 0) + 1;
+    if (task.state === 'question_failed') {
+      const pendingAnswer = task.pendingAnswer;
+      if (!pendingAnswer) throw new Error('ANSWER_RETRY_NOT_AVAILABLE');
+      this._transition(session, task, 'questioning', 'RETRY_REQUESTED');
+      await this.repository.save(session, userId);
+      return this.submitAnswer(id, userId, taskId, pendingAnswer);
+    }
+    if (
+      task.state === 'verification_failed'
+      && task.candidate?.verification?.findings?.some(
+        (finding) => finding.type === 'semantic_audit_unavailable',
+      )
+    ) {
+      return this._retryCandidateVerification(session, task, userId);
+    }
     this._transition(session, task, 'generating', 'RETRY_REQUESTED');
     await this.repository.save(session, userId);
     return this.generateCandidate(id, userId, taskId);
@@ -245,6 +447,69 @@ class AgentOrchestrator {
   async _get(id, userId) { const value = await this.repository.get(id, userId); if (!value) throw new Error('AGENT_SESSION_NOT_FOUND'); return value; }
   _task(session, id) { const task = session.tasks.find((item) => item.id === id); if (!task) throw new Error('AGENT_TASK_NOT_FOUND'); return task; }
   _factsForTask(session, task) { return session.resumeFacts.filter((fact) => task.factIds.includes(fact.id)); }
+  _confirmedFactsForTask(session, task) {
+    return this._factsForTask(session, task)
+      .filter((fact) => ['confirmed', 'corrected'].includes(fact.confirmation));
+  }
+  _fallbackQuestion() {
+    return '请补充你本人具体做了什么、服务对象，以及使用的方法或产出。';
+  }
+  _nextQuestion(assessment = {}) {
+    if (assessment.questionHint) return assessment.questionHint;
+    const field = assessment.missingFields?.[0];
+    return ({
+      action: '你具体做了什么？',
+      context: '这项工作服务于什么场景或对象？',
+      contribution: '其中由你本人负责的部分是什么？',
+      method: '你使用了什么方法？',
+      result: '最终形成了什么结果或产出？',
+    })[field] || this._fallbackQuestion();
+  }
+  _nonEmptyPatch(value = {}) {
+    return Object.fromEntries(Object.entries(value).filter(([, item]) => (
+      item !== undefined && item !== null && item !== ''
+    )));
+  }
+  _buildHandoff(session, task, {
+    finalText,
+    verificationStatus,
+    riskAcknowledged = false,
+    contentSource = 'user_edited',
+  }) {
+    return {
+      taskId: task.id,
+      originalText: task.initialText
+        || this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n'),
+      finalText,
+      factRefs: task.candidate?.factRefs || task.factIds,
+      contentSource,
+      verificationStatus,
+      riskAcknowledged,
+    };
+  }
+  async _retryCandidateVerification(session, task, userId) {
+    const facts = this._confirmedFactsForTask(session, task);
+    const requirement = session.requirements.find((item) => item.id === task.requirementId);
+    const { verification: _previous, contentSource: _source, ...candidate } = task.candidate;
+    let verification;
+    try {
+      verification = this.tools.verifyRevision
+        ? await this.tools.verifyRevision({ candidate, facts, requirement })
+        : evaluateCandidate(candidate, facts);
+    } catch (error) {
+      verification = {
+        status: 'unavailable',
+        findings: [{ type: 'semantic_audit_unavailable', message: error.message }],
+        factRefs: candidate.factRefs || [],
+      };
+    }
+    task.candidate.verification = verification;
+    const nextState = ['passed', 'warning'].includes(verification.status)
+      ? 'awaiting_user_decision'
+      : verification.status === 'unavailable' ? 'verification_failed' : 'generation_failed';
+    this._transition(session, task, nextState, 'CANDIDATE_REVERIFIED', 'verifyRevision');
+    return this.repository.save(session, userId);
+  }
   _startAnalysisHeartbeat(id, userId, token) {
     let stopped = false;
     let claimLost = false;

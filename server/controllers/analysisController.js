@@ -4,6 +4,7 @@ const Resume = require('../models/Resume');
 const Supplement = require('../models/Supplement');
 const matchAnalyzer = require('../services/matchAnalyzer');
 const sectionReevaluator = require('../services/sectionReevaluator');
+const { publicError, sendError } = require('../utils/appError');
 
 /**
  * 发起分析
@@ -16,7 +17,7 @@ exports.create = async (req, res) => {
   try {
     const { jdId, resumeId, name } = req.body;
     if (!jdId || !resumeId) {
-      return res.status(400).json({ error: 'jdId和resumeId不能为空' });
+      return sendError(res, publicError('ANALYSIS_INPUT_REQUIRED', 'jdId 和 resumeId 不能为空'));
     }
 
     // 获取JD和简历
@@ -25,8 +26,8 @@ exports.create = async (req, res) => {
       Resume.findOne({ _id: resumeId, userId: req.userId }),
     ]);
 
-    if (!jd) return res.status(404).json({ error: 'JD不存在' });
-    if (!resume) return res.status(404).json({ error: '简历不存在' });
+    if (!jd) return sendError(res, publicError('JD_NOT_FOUND', 'JD 不存在或无权访问', { status: 404 }));
+    if (!resume) return sendError(res, publicError('RESUME_NOT_FOUND', '简历不存在或无权访问', { status: 404 }));
 
     // 创建分析记录（状态：处理中）
     const analysis = new Analysis({
@@ -93,7 +94,7 @@ exports.create = async (req, res) => {
     });
   } catch (error) {
     console.error('发起分析失败:', error);
-    res.status(500).json({ error: '发起分析失败: ' + error.message });
+    sendError(res, error);
   }
 };
 
@@ -107,12 +108,12 @@ exports.getById = async (req, res) => {
       .populate({ path: 'resumeId', select: 'rawText parsed', match: { userId: req.userId } });
 
     if (!analysis) {
-      return res.status(404).json({ error: '分析记录不存在' });
+      return sendError(res, publicError('ANALYSIS_NOT_FOUND', '分析记录不存在或无权访问', { status: 404 }));
     }
 
     res.json(analysis);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    sendError(res, error);
   }
 };
 
@@ -123,11 +124,11 @@ exports.getStatus = async (req, res) => {
   try {
     const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.userId }, 'status errorMessage');
     if (!analysis) {
-      return res.status(404).json({ error: '分析记录不存在' });
+      return sendError(res, publicError('ANALYSIS_NOT_FOUND', '分析记录不存在或无权访问', { status: 404 }));
     }
     res.json({ status: analysis.status, errorMessage: analysis.errorMessage });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    sendError(res, error);
   }
 };
 
@@ -138,14 +139,17 @@ exports.reevaluateSection = async (req, res) => {
   try {
     const { sectionType, sectionIndex, revisedText } = req.body;
     if (!sectionType || sectionIndex === undefined || !revisedText) {
-      return res.status(400).json({ error: 'sectionType、sectionIndex、revisedText 不能为空' });
+      return sendError(res, publicError(
+        'REEVALUATION_INPUT_REQUIRED',
+        'sectionType、sectionIndex、revisedText 不能为空',
+      ));
     }
 
     const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.userId })
       .populate({ path: 'jdId', select: 'parsed', match: { userId: req.userId } });
 
     if (!analysis || !analysis.jdId) {
-      return res.status(404).json({ error: '分析记录不存在' });
+      return sendError(res, publicError('ANALYSIS_NOT_FOUND', '分析记录不存在或无权访问', { status: 404 }));
     }
 
     // 找到对应的板块
@@ -155,7 +159,7 @@ exports.reevaluateSection = async (req, res) => {
     );
 
     if (!originalSection) {
-      return res.status(404).json({ error: '未找到对应板块' });
+      return sendError(res, publicError('SECTION_NOT_FOUND', '未找到对应板块', { status: 404 }));
     }
 
     // 调用 AI 重评估
@@ -187,7 +191,7 @@ exports.reevaluateSection = async (req, res) => {
       { runValidators: true },
     );
     if (write.matchedCount === 0) {
-      return res.status(404).json({ error: '分析记录不存在' });
+      return sendError(res, publicError('ANALYSIS_NOT_FOUND', '分析记录不存在或无权访问', { status: 404 }));
     }
 
     res.json({
@@ -201,6 +205,6 @@ exports.reevaluateSection = async (req, res) => {
     });
   } catch (error) {
     console.error('板块重评估失败:', error);
-    res.status(500).json({ error: '板块重评估失败: ' + error.message });
+    sendError(res, error);
   }
 };

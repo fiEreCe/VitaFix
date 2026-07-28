@@ -1,5 +1,6 @@
 const Supplement = require('../models/Supplement');
 const Resume = require('../models/Resume');
+const { publicError, sendError } = require('../utils/appError');
 
 function createSupplementController({
   Supplement: SupplementRepository = Supplement,
@@ -9,10 +10,10 @@ function createSupplementController({
     async upsert(req, res) {
       try {
         const { resumeId, items } = req.body;
-        if (!resumeId) return res.status(400).json({ error: 'resumeId不能为空' });
+        if (!resumeId) return sendError(res, publicError('RESUME_ID_REQUIRED', 'resumeId 不能为空'));
 
         const ownedResume = await ResumeRepository.exists({ _id: resumeId, userId: req.userId });
-        if (!ownedResume) return res.status(404).json({ error: '简历不存在' });
+        if (!ownedResume) return sendError(res, publicError('RESUME_NOT_FOUND', '简历不存在或无权访问', { status: 404 }));
 
         const filter = { userId: req.userId, resumeId };
         const now = new Date();
@@ -35,10 +36,10 @@ function createSupplementController({
             { new: true, runValidators: true },
           );
         }
-        if (!supplement) return res.status(404).json({ error: '补充信息不存在' });
+        if (!supplement) return sendError(res, publicError('SUPPLEMENT_NOT_FOUND', '补充信息不存在或无权访问', { status: 404 }));
         return res.json({ id: supplement._id, items: supplement.items });
       } catch (error) {
-        return res.status(500).json({ error: error.message });
+        return sendError(res, error);
       }
     },
 
@@ -51,7 +52,7 @@ function createSupplementController({
         if (!supplement) return res.json({ items: [] });
         return res.json(supplement);
       } catch (error) {
-        return res.status(500).json({ error: error.message });
+        return sendError(res, error);
       }
     },
   };

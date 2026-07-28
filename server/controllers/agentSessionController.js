@@ -3,6 +3,7 @@ const JD = require('../models/JD');
 const Resume = require('../models/Resume');
 const { AgentOrchestrator } = require('../services/agent/agentOrchestrator');
 const tools = require('../services/agent/agentToolService');
+const { sendError } = require('../utils/appError');
 
 async function loadOwnedInputs(jdId, resumeId, userId) {
   const [jd, resume] = await Promise.all([
@@ -97,22 +98,12 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
   const repository = createAgentSessionRepository();
   const app = orchestrator || new AgentOrchestrator({ repository, tools });
   const getInputs = loadInputs || loadOwnedInputs;
-  const fail = (res, error) => {
-    const notFound = ['AGENT_SESSION_NOT_FOUND', 'INPUT_NOT_FOUND'].includes(error.message);
-    return res.status(notFound ? 404 : 400).json({
-      error: {
-        code: error.message,
-        message: '操作未完成，请检查输入后重试',
-        retryable: !notFound,
-      },
-    });
-  };
   const ensureOwned = async (req) => { if (!await repository.get(req.params.id, req.userId)) throw new Error('AGENT_SESSION_NOT_FOUND'); };
-  const command = (fn) => async (req, res) => { try { await ensureOwned(req); res.json(await fn(req)); } catch (error) { fail(res, error); } };
+  const command = (fn) => async (req, res) => { try { await ensureOwned(req); res.json(await fn(req)); } catch (error) { sendError(res, error); } };
 
   return {
-    async create(req, res) { try { const { jdId, resumeId } = req.body || {}; if (!jdId || !resumeId) throw new Error('INPUT_REQUIRED'); const input = await getInputs(jdId, resumeId, req.userId); const session = await app.createSession({ userId: req.userId, jdId, resumeId, ...input }); res.status(201).json({ id: session.id || session._id.toString(), state: session.state }); } catch (error) { fail(res, error); } },
-    async get(req, res) { const session = await repository.get(req.params.id, req.userId); return session ? res.json(session) : res.status(404).json({ error: { code: 'AGENT_SESSION_NOT_FOUND' } }); },
+    async create(req, res) { try { const { jdId, resumeId } = req.body || {}; if (!jdId || !resumeId) throw new Error('INPUT_REQUIRED'); const input = await getInputs(jdId, resumeId, req.userId); const session = await app.createSession({ userId: req.userId, jdId, resumeId, ...input }); res.status(201).json({ id: session.id || session._id.toString(), state: session.state }); } catch (error) { sendError(res, error); } },
+    async get(req, res) { try { const session = await repository.get(req.params.id, req.userId); if (!session) throw new Error('AGENT_SESSION_NOT_FOUND'); return res.json(session); } catch (error) { return sendError(res, error); } },
     start: command((req) => app.startAnalysis(req.params.id, req.userId)),
     selectTask: command((req) => app.selectTask(req.params.id, req.userId, req.params.taskId)),
     answer: command((req) => { if (!req.body?.answer?.trim()) throw new Error('ANSWER_REQUIRED'); return app.submitAnswer(req.params.id, req.userId, req.params.taskId, req.body.answer.trim()); }),
