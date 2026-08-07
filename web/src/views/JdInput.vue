@@ -4,27 +4,41 @@
       <!-- 方式选择 -->
       <div class="method-tabs" role="tablist" aria-label="输入方式">
         <button
+          id="jd-method-tab-0"
           type="button"
           role="tab"
           :class="['method-tab', 'pressable', { active: method === 'text' }]"
           :aria-selected="method === 'text'"
+          aria-controls="jd-method-panel-0"
+          :tabindex="method === 'text' ? 0 : -1"
           @click="method = 'text'"
+          @keydown="handleMethodKeydown"
         >
           <van-icon name="edit" aria-hidden="true" /> 粘贴文本
         </button>
         <button
+          id="jd-method-tab-1"
           type="button"
           role="tab"
           :class="['method-tab', 'pressable', { active: method === 'image' }]"
           :aria-selected="method === 'image'"
+          aria-controls="jd-method-panel-1"
+          :tabindex="method === 'image' ? 0 : -1"
           @click="method = 'image'"
+          @keydown="handleMethodKeydown"
         >
           <van-icon name="photo" aria-hidden="true" /> 截图识别
         </button>
       </div>
 
       <!-- 文本输入 -->
-      <div v-if="method === 'text'" class="text-input-area">
+      <div
+        v-if="method === 'text'"
+        id="jd-method-panel-0"
+        class="text-input-area"
+        role="tabpanel"
+        aria-labelledby="jd-method-tab-0"
+      >
         <van-field
           v-model="jdText"
           type="textarea"
@@ -37,7 +51,13 @@
       </div>
 
       <!-- 截图识别 -->
-      <div v-else class="image-input-area">
+      <div
+        v-else
+        id="jd-method-panel-1"
+        class="image-input-area"
+        role="tabpanel"
+        aria-labelledby="jd-method-tab-1"
+      >
         <van-uploader
           :after-read="handleImageUpload"
           accept="image/*"
@@ -160,6 +180,23 @@ const showResult = ref(false)
 const parsedResult = ref({})
 const currentJdId = ref('')
 const imagePreview = ref('')
+
+const inputMethods = ['text', 'image']
+
+function handleMethodKeydown(event) {
+  const currentIndex = inputMethods.indexOf(method.value)
+  let nextIndex
+
+  if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % inputMethods.length
+  else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + inputMethods.length) % inputMethods.length
+  else if (event.key === 'Home') nextIndex = 0
+  else if (event.key === 'End') nextIndex = inputMethods.length - 1
+  else return
+
+  event.preventDefault()
+  method.value = inputMethods[nextIndex]
+  document.getElementById(`jd-method-tab-${nextIndex}`)?.focus()
+}
 
 // 截图上传 → OCR识别（仅提取文字，不自动解析JD）
 async function handleImageUpload(file) {

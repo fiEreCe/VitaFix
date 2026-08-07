@@ -59,11 +59,11 @@
       </div>
 
       <div v-else class="history-list">
-        <div
+        <RouterLink
           v-for="item in list.slice(0, 5)"
           :key="item.id"
           class="history-card"
-          @click="$router.push(`/result/${item.id}`)"
+          :to="`/result/${item.id}`"
         >
           <div class="card-left">
             <div class="card-name">{{ item.name }}</div>
@@ -78,7 +78,7 @@
             <div class="score-num" :style="{ color: getGradeColor(item.score) }">{{ item.score }}</div>
             <div class="score-grade" :style="{ color: getGradeColor(item.score) }">{{ item.grade }}</div>
           </div>
-        </div>
+        </RouterLink>
       </div>
       </section>
 
@@ -96,7 +96,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { historyApi } from '../api'
 import { formatDate, getGradeColor } from '../utils/format'
 import AppPage from '../components/ui/AppPage.vue'
@@ -306,10 +306,18 @@ function startNewAnalysis() {
   cursor: pointer;
   transition: transform 0.15s;
   box-shadow: var(--shadow-sm);
+  color: inherit;
+  text-decoration: none;
 }
 
 .history-card:active {
   transform: scale(0.98);
+}
+
+.history-card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+  box-shadow: var(--focus-ring);
 }
 
 .card-left {

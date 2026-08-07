@@ -4,27 +4,40 @@
       <!-- 输入方式切换 -->
       <div class="method-tabs" role="tablist" aria-label="输入方式">
         <button
+          id="resume-method-tab-0"
           type="button"
           role="tab"
           :class="['method-tab', 'pressable', { active: method === 'paste' }]"
           :aria-selected="method === 'paste'"
+          aria-controls="resume-method-panel-0"
+          :tabindex="method === 'paste' ? 0 : -1"
           @click="method = 'paste'"
+          @keydown="handleMethodKeydown"
         >
           <van-icon name="edit" aria-hidden="true" /> 粘贴文本
         </button>
         <button
+          id="resume-method-tab-1"
           type="button"
           role="tab"
           :class="['method-tab', 'pressable', { active: method === 'upload' }]"
           :aria-selected="method === 'upload'"
+          aria-controls="resume-method-panel-1"
+          :tabindex="method === 'upload' ? 0 : -1"
           @click="method = 'upload'"
+          @keydown="handleMethodKeydown"
         >
           <van-icon name="uploader" aria-hidden="true" /> 上传文件
         </button>
       </div>
 
       <!-- ============= 方式一：粘贴文本 ============= -->
-      <div v-if="method === 'paste'">
+      <div
+        v-if="method === 'paste'"
+        id="resume-method-panel-0"
+        role="tabpanel"
+        aria-labelledby="resume-method-tab-0"
+      >
         <div class="tip-card">
           <van-icon name="info-o" />
           <span>从简历文件（PDF/Word）中复制全文，粘贴到下方。AI会自动识别各个板块。</span>
@@ -42,7 +55,13 @@
       </div>
 
       <!-- ============= 方式二：上传文件 ============= -->
-      <div v-else class="upload-method">
+      <div
+        v-else
+        id="resume-method-panel-1"
+        class="upload-method"
+        role="tabpanel"
+        aria-labelledby="resume-method-tab-1"
+      >
         <div class="tip-card">
           <van-icon name="info-o" />
           <span>支持 PDF、DOCX、TXT 格式，文件最大 20MB</span>
@@ -52,21 +71,20 @@
         <label
           for="resume-file"
           class="drop-zone"
-          :class="{ dragover: isDragover, 'has-file': uploadedFile }"
-          role="button"
-          tabindex="0"
+          :class="{ dragover: isDragover, 'has-file': uploadedFile, 'is-uploading': uploading }"
+          :aria-busy="uploading"
           @dragover.prevent="isDragover = true"
           @dragleave.prevent="isDragover = false"
           @drop.prevent="handleDrop"
-          @keydown.enter.prevent="triggerFileInput"
-          @keydown.space.prevent="triggerFileInput"
         >
           <input
             id="resume-file"
-            ref="fileInput"
             class="file-input"
             type="file"
             accept=".pdf,.docx,.doc,.txt"
+            aria-label="上传简历文件"
+            :aria-busy="uploading"
+            :disabled="uploading"
             @change="handleFileSelect"
           />
 
@@ -188,10 +206,26 @@ const parsedResult = ref(null)
 const currentResumeId = ref('')
 
 // 文件上传状态
-const fileInput = ref(null)
 const uploadedFile = ref(null)
 const isDragover = ref(false)
 const uploading = ref(false)
+
+const inputMethods = ['paste', 'upload']
+
+function handleMethodKeydown(event) {
+  const currentIndex = inputMethods.indexOf(method.value)
+  let nextIndex
+
+  if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % inputMethods.length
+  else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + inputMethods.length) % inputMethods.length
+  else if (event.key === 'Home') nextIndex = 0
+  else if (event.key === 'End') nextIndex = inputMethods.length - 1
+  else return
+
+  event.preventDefault()
+  method.value = inputMethods[nextIndex]
+  document.getElementById(`resume-method-tab-${nextIndex}`)?.focus()
+}
 
 const jdId = computed(() => route.query.jdId || '')
 
@@ -206,10 +240,6 @@ function handleDrop(e) {
 function handleFileSelect(e) {
   const file = e.target.files[0]
   if (file) uploadFile(file)
-}
-
-function triggerFileInput() {
-  if (!uploading.value) fileInput.value?.click()
 }
 
 /** 上传并解析文件 */
@@ -356,12 +386,26 @@ function formatFileSize(bytes) {
 
 .file-input {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.drop-zone:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.drop-zone.is-uploading {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.file-input:disabled {
+  cursor: progress;
 }
 
 .drop-zone:hover {
