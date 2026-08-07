@@ -1,12 +1,17 @@
 <template>
-  <div class="agent-workbench">
-    <van-nav-bar title="证据驱动简历优化" left-arrow @click-left="$router.back()" />
-    <div v-if="loading" class="state"><van-loading size="32">正在建立证据匹配…</van-loading></div>
-    <div v-else-if="error" class="state"><van-empty description="会话加载失败" /><van-button round @click="load">重试</van-button></div>
-    <main v-else class="content">
+  <AppPage title="证据驱动简历优化" description="确认事实，再决定如何表达" back @back="$router.back()">
+    <StatusPanel v-if="loading" kind="loading" title="正在建立证据匹配…" message="正在加载优化任务与审核上下文。" />
+    <StatusPanel v-else-if="error" kind="error" title="会话加载失败" message="会话状态未丢失，可以重试加载。" retryable @retry="load" />
+    <div v-else class="agent-workbench">
       <van-notice-bar v-if="actionError" color="#ee0a24" :text="actionError" />
-      <section class="card"><h3>优化任务</h3><van-cell v-for="item in session.tasks" :key="item.id" clickable @click="select(item)"><template #title>{{ item.recommended ? '推荐 · ' : '' }}{{ requirement(item).sourceText }}</template><template #label>{{ item.gapType === 'expression' ? '已有证据，可优化表达' : '需要补充事实' }}</template><template #value>{{ item.state }}</template></van-cell></section>
-      <template v-if="task">
+      <div class="agent-layout adaptive-grid adaptive-grid--sidebar adaptive-grid--context">
+        <AgentTaskNavigation
+          :tasks="session.tasks"
+          :requirements="session.requirements"
+          :selected-id="task?.id"
+          @select="select"
+        />
+        <section v-if="task" class="agent-stage" aria-label="当前优化任务">
         <section class="card"><h3>岗位依据</h3><p>{{ requirement(task).sourceText }}</p><h3>可用事实</h3><p v-for="fact in facts(task)" :key="fact.id">{{ fact.sourceText }}</p></section>
         <section v-if="task.state === 'questioning'" class="card"><h3>补充一个关键事实（{{ task.effectiveRounds }}/3）</h3><p>{{ task.currentQuestion || '请补充你本人具体做了什么、服务对象，以及使用的方法或产出。' }}</p><van-field v-model="answer" rows="3" autosize type="textarea" placeholder="例如：我设计访谈提纲并整理了用户洞察" /><van-button type="primary" block round :loading="busy" @click="submitAnswer">提交并确认事实</van-button><div class="minor"><van-button size="small" @click="specialAnswer('不记得')">不记得</van-button><van-button size="small" @click="specialAnswer('没有做过')">没有做过</van-button><van-button size="small" @click="specialAnswer('无法证明')">无法证明</van-button></div></section>
         <section v-if="task.state === 'awaiting_fact_confirmation'" class="card"><h3>请确认提取的事实</h3><p>{{ pendingFact(task)?.sourceText }}</p><van-button type="primary" block round :loading="busy" @click="reviewFact('confirm')">确认无误</van-button><van-button plain block round style="margin-top:8px" @click="reviewFact('reject')">不是这个意思</van-button></section>
@@ -19,14 +24,25 @@
         <section v-if="task.state === 'user_edited' && !editMode" class="card"><h3>用户编辑，未经验证</h3><p>保存草稿不会触发审核。完成本轮修改后，可主动验证事实风险和表达效果。</p><van-button type="primary" block round :loading="busy" @click="validateSavedEdit">完成修改并验证</van-button><van-button plain block round style="margin-top:8px" @click="editMode=true">继续编辑</van-button></section>
         <section v-if="task.state === 'return_control'" class="card"><h3>自动追问已暂停</h3><p>你可以继续补充、手动编辑或暂时跳过；系统不会强制生成。</p><van-button block round type="primary" @click="returnControl('continue')">继续补充</van-button><van-button block round style="margin-top:8px" @click="editMode=true">自己编辑</van-button><van-button block round style="margin-top:8px" @click="returnControl('skip')">暂时跳过</van-button></section>
         <section v-if="['accepted','rejected','skipped','ready_for_reevaluation','completed_with_risk'].includes(task.state)" class="card success"><h3>本任务已完成</h3><p v-if="task.state === 'completed_with_risk'">已确认保留风险内容；该文本未标记为“已验证”。</p><p v-else-if="latestValidation(task)?.safetyStatus === 'passed'">当前文本已验证，并已写入最终交接。</p><p v-else>已保留来源、事实引用和审核状态，可继续处理下一项任务。</p><van-button v-if="task.state === 'ready_for_reevaluation'" plain block round @click="startEdit">继续编辑</van-button></section>
-      </template>
-    </main>
-  </div>
+        </section>
+        <AgentEvidenceContext
+          v-if="task"
+          :requirement="requirement(task)"
+          :facts="facts(task)"
+          :validation="latestValidation(task)"
+        />
+      </div>
+    </div>
+  </AppPage>
 </template>
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { agentSessionApi } from '../api'
+import AgentEvidenceContext from '../components/agent/AgentEvidenceContext.vue'
+import AgentTaskNavigation from '../components/agent/AgentTaskNavigation.vue'
+import AppPage from '../components/ui/AppPage.vue'
+import StatusPanel from '../components/ui/StatusPanel.vue'
 const route = useRoute(); const session = ref(null); const loading = ref(true); const error = ref(false); const busy = ref(false); const actionError = ref(''); const selectedId = ref(''); const answer = ref(''); const editMode = ref(false); const editedText = ref('')
 const task = computed(() => session.value?.tasks.find((item) => item.id === selectedId.value) || session.value?.tasks.find((item) => item.recommended))
 const requirement = (item) => session.value.requirements.find((entry) => entry.id === item.requirementId) || { sourceText: '岗位要求' }
@@ -56,5 +72,8 @@ async function run(command) { busy.value = true; actionError.value = ''; try { a
 onMounted(load)
 </script>
 <style scoped>
-.agent-workbench{min-height:100vh;background:var(--bg-page)}.content{padding:16px}.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow-sm)}h3{font-size:16px;margin:0 0 10px}.candidate{white-space:pre-wrap;line-height:1.7}.risk{color:#9a6700}.state{padding:80px 24px;text-align:center}.success{background:#f0fff4}.minor{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.agent-workbench{min-width:0}.agent-layout{margin-top:var(--spacing-lg)}.agent-stage{min-width:0}.card{background:var(--surface-content);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:var(--spacing-lg);margin-bottom:var(--spacing-md);box-shadow:var(--shadow-sm)}h3{font-size:16px;margin:0 0 10px}.candidate{white-space:pre-wrap;line-height:1.7}.risk{color:#9a6700}.success{background:#f0fff4}.minor{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+@media (min-width:56.25rem){.task-navigation,.evidence-context{position:sticky;top:6rem;max-height:calc(100svh - 7rem);overflow:auto}}
+@media (min-width:56.25rem) and (max-width:74.999rem){.evidence-context{grid-column:2}}
 </style>
