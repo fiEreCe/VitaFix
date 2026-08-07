@@ -9,6 +9,7 @@
           :tasks="session.tasks"
           :requirements="session.requirements"
           :selected-id="task?.id"
+          :disabled="busy"
           @select="select"
         />
         <section v-if="task" class="agent-stage" aria-label="当前优化任务">
@@ -44,13 +45,19 @@ import AgentTaskNavigation from '../components/agent/AgentTaskNavigation.vue'
 import AppPage from '../components/ui/AppPage.vue'
 import StatusPanel from '../components/ui/StatusPanel.vue'
 const route = useRoute(); const session = ref(null); const loading = ref(true); const error = ref(false); const busy = ref(false); const actionError = ref(''); const selectedId = ref(''); const answer = ref(''); const editMode = ref(false); const editedText = ref('')
-const task = computed(() => session.value?.tasks.find((item) => item.id === selectedId.value) || session.value?.tasks.find((item) => item.recommended))
+const task = computed(() => {
+  const tasks = session.value?.tasks ?? []
+  return tasks.find((item) => item.id === selectedId.value)
+    || tasks.find((item) => item.id === session.value?.currentTaskId)
+    || tasks.find((item) => item.recommended)
+    || tasks[0]
+})
 const requirement = (item) => session.value.requirements.find((entry) => entry.id === item.requirementId) || { sourceText: '岗位要求' }
 const facts = (item) => session.value.resumeFacts.filter((fact) => item.factIds.includes(fact.id))
 const pendingFact = (item) => session.value.resumeFacts.find((fact) => fact.id === item.pendingFactId)
 const latestValidation = (item) => item.validationRecords?.at(-1)
 async function load() { loading.value = true; error.value = false; try { session.value = await agentSessionApi.get(route.params.id) } catch (_) { error.value = true } finally { loading.value = false } }
-function select(item) { selectedId.value = item.id; if (item.state === 'pending') run(() => agentSessionApi.selectTask(route.params.id, item.id)) }
+function select(item) { if (busy.value || !item) return; selectedId.value = item.id; if (item.state === 'pending') run(() => agentSessionApi.selectTask(route.params.id, item.id)) }
 function generate() { run(() => agentSessionApi.generate(route.params.id, task.value.id)) }
 function retry() { run(() => agentSessionApi.retry(route.params.id, task.value.id)) }
 function submitAnswer() { if (!answer.value.trim()) return; run(async () => { await agentSessionApi.answer(route.params.id, task.value.id, answer.value); answer.value = '' }) }
@@ -68,7 +75,7 @@ function verificationLabel(status) { return ({ passed: '已通过事实校验', 
 function verificationHint(status) { return status === 'warning' ? '该表达包含估算信息，请确认后再采用。' : '系统未将该 AI 内容标记为可采用。' }
 function outcomeLabel(status) { return ({ improved: '有明确改善', unchanged: '暂无明显变化', regressed: '效果有所下降', tradeoff: '有改善，也有新问题' })[status] || status }
 function safetyLabel(status) { return ({ passed: '已验证', warning: '已检查，有风险提示', blocked: '存在事实风险', unavailable: '暂未完成验证' })[status] || status }
-async function run(command) { busy.value = true; actionError.value = ''; try { await command(); await load() } catch (e) { actionError.value = e.message } finally { busy.value = false } }
+async function run(command) { if (busy.value) return; busy.value = true; actionError.value = ''; try { await command(); await load() } catch (e) { actionError.value = e.message } finally { busy.value = false } }
 onMounted(load)
 </script>
 <style scoped>

@@ -14,6 +14,10 @@ const props = defineProps({
     type: [String, Number],
     default: '',
   },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 defineEmits(['select'])
@@ -61,6 +65,7 @@ function stateLabel(state) {
         :key="item?.id ?? `task-${index}`"
         class="task-row pressable"
         type="button"
+        :disabled="disabled"
         :aria-current="item?.id === selectedId ? 'step' : undefined"
         @click="$emit('select', item)"
       >
@@ -109,6 +114,12 @@ h2 {
 .task-row[aria-current='step'] {
   background: var(--surface-selected);
   border-color: var(--color-primary);
+}
+
+.task-row:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+  opacity: 0.68;
 }
 
 .task-row__title {
