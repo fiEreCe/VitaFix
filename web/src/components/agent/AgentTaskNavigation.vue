@@ -29,6 +29,9 @@ function requirementText(task) {
 function stateLabel(state) {
   return ({
     pending: '待开始',
+    capability_gap: '能力缺口',
+    parse_failed: '简历解析失败',
+    match_failed: '证据匹配失败',
     assessing_evidence: '正在评估证据',
     questioning: '需要补充事实',
     awaiting_fact_confirmation: '等待确认事实',

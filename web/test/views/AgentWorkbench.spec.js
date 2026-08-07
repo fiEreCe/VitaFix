@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import AgentTaskNavigation from '../../src/components/agent/AgentTaskNavigation.vue'
 import AgentWorkbench from '../../src/views/AgentWorkbench.vue'
 
 const { back, getSession } = vi.hoisted(() => ({
@@ -91,5 +92,23 @@ describe('AgentWorkbench adaptive evidence workspace', () => {
       expect(source).toMatch(/defineEmits/)
       expect(source).not.toMatch(/(?:from\s+['"][^'"]*api|agentSessionApi)/)
     }
+  })
+
+  it.each([
+    ['capability_gap', '能力缺口'],
+    ['parse_failed', '简历解析失败'],
+    ['match_failed', '证据匹配失败'],
+  ])('keeps the %s task state explicit instead of implying success', (state, label) => {
+    const wrapper = mount(AgentTaskNavigation, {
+      props: {
+        tasks: [{ id: `task-${state}`, requirementId: 'requirement-1', state }],
+        requirements: [{ id: 'requirement-1', sourceText: '用户研究' }],
+        selectedId: `task-${state}`,
+      },
+    })
+
+    const stateText = wrapper.get('.task-row__state').text()
+    expect(stateText).toBe(label)
+    expect(stateText).not.toMatch(/成功|通过/)
   })
 })
