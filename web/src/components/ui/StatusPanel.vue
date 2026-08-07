@@ -4,7 +4,7 @@ import { computed } from 'vue'
 const props = defineProps({
   kind: {
     type: String,
-    default: '',
+    default: 'empty',
   },
   title: {
     type: String,
@@ -29,7 +29,7 @@ const live = computed(() => (props.kind === 'error' ? 'assertive' : 'polite'))
 <template>
   <section
     class="status-panel"
-    :class="kind && `status-panel--${kind}`"
+    :class="`status-panel--${kind}`"
     :role="role"
     :aria-live="live"
   >
@@ -55,11 +55,10 @@ const live = computed(() => (props.kind === 'error' ? 'assertive' : 'polite'))
   text-align: center;
   background: var(--surface-content);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
 }
 
-.status-panel h2,
-.status-panel p {
+.status-panel h2 {
   margin: 0;
 }
 
@@ -69,13 +68,15 @@ const live = computed(() => (props.kind === 'error' ? 'assertive' : 'polite'))
 }
 
 .status-panel p {
+  margin: 0.5rem 0 0;
   max-width: var(--reading-max);
   color: var(--text-secondary);
 }
 
 .status-panel__retry {
+  margin-top: 1rem;
   min-height: 2.75rem;
-  padding: 0.625rem 1.25rem;
+  padding: 0 1.25rem;
   color: #fff;
   background: var(--color-primary);
   border: 0;

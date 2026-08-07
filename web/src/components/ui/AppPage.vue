@@ -34,7 +34,6 @@ defineEmits(['back'])
         >
           <span aria-hidden="true">←</span>
         </button>
-        <div v-else class="app-chrome__spacer" aria-hidden="true" />
 
         <div class="app-chrome__title">
           <p v-if="eyebrow" class="app-chrome__eyebrow">{{ eyebrow }}</p>
@@ -55,23 +54,18 @@ defineEmits(['back'])
 </template>
 
 <style scoped>
-.app-page {
-  min-height: 100%;
-}
-
 .app-chrome {
   position: sticky;
   z-index: 20;
   top: 0;
   background: var(--surface-material);
-  border-bottom: 1px solid var(--border-subtle);
   backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
 }
 
 .app-chrome__inner {
   display: grid;
-  grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--spacing-md);
   align-items: center;
   width: 100%;
@@ -88,16 +82,12 @@ defineEmits(['back'])
   height: 2.75rem;
   padding: 0;
   color: var(--text-primary);
-  background: var(--surface-content);
-  border: 1px solid var(--border-subtle);
+  border: 0;
+  background: var(--surface-subtle);
   border-radius: 50%;
   cursor: pointer;
-  font-size: 1.25rem;
-}
-
-.app-chrome__spacer {
-  width: 2.75rem;
-  height: 2.75rem;
+  font-size: 1.75rem;
+  line-height: 1;
 }
 
 .app-chrome__title {
@@ -111,7 +101,7 @@ defineEmits(['back'])
 
 .app-chrome__title h1 {
   overflow-wrap: anywhere;
-  font-size: 1.25rem;
+  font-size: var(--type-headline);
   line-height: 1.2;
   letter-spacing: -0.01em;
 }
@@ -143,8 +133,5 @@ defineEmits(['back'])
     padding: 1rem 2rem;
   }
 
-  .app-chrome__title h1 {
-    font-size: 1.375rem;
-  }
 }
 </style>
