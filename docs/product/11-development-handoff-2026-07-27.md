@@ -1,6 +1,6 @@
 ---
-title: PF-001 至 PF-004 逻辑加固开发交接
-owner: 开发负责人（待指定）
+title: V0.1 求职作品版开发与发布交接
+owner: 开发负责人
 reviewers:
   - 产品负责人
   - 后端负责人
@@ -8,23 +8,25 @@ reviewers:
   - AI 负责人
   - 测试负责人
 status: in_progress
-version: "1.0"
+version: "1.1"
 created_at: 2026-07-27
-updated_at: 2026-07-28
+updated_at: 2026-08-08
 related_docs:
   - ./00-version-specification-and-roadmap.md
   - ./10-v0.1-development-readiness-and-execution-plan.md
   - ../superpowers/specs/2026-07-26-pf001-pf004-logic-hardening-design.md
   - ../superpowers/plans/2026-07-26-pf001-pf004-logic-hardening.md
+  - ../superpowers/specs/2026-08-08-responsive-apple-workspace-design.md
+  - ../superpowers/plans/2026-08-08-responsive-apple-workspace.md
 ---
 
-# PF-001 至 PF-004 逻辑加固开发交接
+# V0.1 求职作品版开发与发布交接
 
 ## 1. 交接摘要
 
 本轮开发从 PF-001 至 PF-004 代码审查开始。审查发现状态持久化、并发启动、数据归属、中文证据匹配、安全审核、修改效果验证、最终交接和演示契约等问题。
 
-截至 2026-07-28：
+截至 2026-08-08：
 
 - 已完成状态持久化、状态迁移、并发启动保护、崩溃恢复租约和用户数据归属加固。
 - 已完成旧 JD、Resume、Supplement 所有权迁移工具及维护路径加固。
@@ -32,7 +34,10 @@ related_docs:
 - PF-002 的确定性红线、独立语义审核、安全降级和固定评测已完成。
 - PF-003 的异步修改验证、不可变记录、状态同步和最终 handoff 已完成。
 - PF-004 的真实 fixture 契约、演示漏斗隔离、结构化错误展示和最终全链路回归已完成。
-- PF-001 至 PF-004 已完成代码级验收；在真实 MongoDB 迁移 dry-run、索引验证和部署验证完成前，仍不建议用于公开处理真实简历。
+- PF-001 至 PF-004 已完成代码级验收，既有本地基线仍为后端 114/114、PF-002 固定评测 42/42、前端 4/4 和生产构建通过。
+- V0.1 求职作品版仍未完成：评测报告、Agent 图、产品案例、三条简历描述、README 和部署证据尚未全部达到交付标准。
+- Apple 风格响应式前端重构已经完成设计和详细计划审批，并在隔离 worktree 中完成 Task 1 的实现与规格修正；规格复审和代码质量审查尚未完成，Task 2 至 Task 8 尚未开始。
+- 在公开部署验证完成前，不应宣称 V0.1 已发布；在真实 MongoDB 迁移 dry-run、索引验证和部署验证完成前，不应公开处理真实简历。
 
 当前结论：
 
@@ -41,8 +46,10 @@ related_docs:
 | PF-001 至 PF-004 代码开发 | `completed` | 三个开发批次和自动化回归均已完成 |
 | 本地质量门禁 | `passed` | 后端 114/114、PF-002 评测 42/42、前端 4/4、生产构建通过 |
 | 功能提交 | `completed` | `308e3e4 feat: complete PF001-PF004 logic hardening` |
+| Apple 响应式重构 | `in_progress` | Task 1 已实现并修正规格偏差，复审待完成；Task 2 至 Task 8 待开发 |
+| 求职交付材料 | `blocked` | 评测报告、Agent 图、案例说明、简历描述和 README 尚未收口 |
 | 真实数据迁移 | `pending` | 尚未运行真实 MongoDB dry-run 和正式迁移 |
-| 发布就绪 | `blocked` | 等待迁移报告审查、索引验证和部署环境回归 |
+| 发布就绪 | `blocked` | 等待前端重构、求职交付材料、公开环境烟测；真实数据场景还需迁移与索引验证 |
 
 文档头部继续保留 `status: in_progress`，表示发布交接尚未结束，不表示 PF-001 至 PF-004 的代码仍未完成。
 
@@ -50,11 +57,16 @@ related_docs:
 
 | 项目 | 当前值 |
 |---|---|
-| 工作树 | `D:\Code\VitaFix` |
-| 分支 | `main` |
+| 主工作树 | `C:\Users\1\Desktop\精投助手demo` |
+| 主分支 / HEAD | `main` / `e22b86f` |
+| 前端重构 worktree | `C:\Users\1\Desktop\精投助手demo\.worktrees\responsive-apple-workspace` |
+| 前端重构分支 / HEAD | `feat/responsive-apple-workspace` / `6f2cccc` |
 | PF-001 至 PF-004 功能基线 | `308e3e4` |
 | 设计文档 | `docs/superpowers/specs/2026-07-26-pf001-pf004-logic-hardening-design.md` |
 | 原详细计划 | `docs/superpowers/plans/2026-07-26-pf001-pf004-logic-hardening.md` |
+| 响应式设计 | `docs/superpowers/specs/2026-08-08-responsive-apple-workspace-design.md` |
+| 响应式实施计划 | `docs/superpowers/plans/2026-08-08-responsive-apple-workspace.md` |
+| Apple 设计技能 | `C:\Users\1\.agents\skills\apple-design\SKILL.md`（已全局安装） |
 | 最近全量后端验证 | 114 个测试通过，0 个失败 |
 
 原详细计划拆分较细。后续交接执行应聚焦原审查缺陷，可合并为三个开发批次，不必继续扩展周边能力。
@@ -273,9 +285,16 @@ Schema 使用部分唯一索引保证同一用户和 Resume 只有一个 Supplem
 
 ### 5.4 当前工作区状态
 
-PF-001 至 PF-004 已合并为本地提交 `308e3e4`。该提交尚未推送远程；继续开发前应先确认工作区保持干净，并从该提交继续。
+主分支当前 HEAD 为 `e22b86f docs: plan responsive Apple workspace implementation`。PF-001 至 PF-004 功能基线 `308e3e4` 已包含在主分支历史中。
 
-本次最终检查未发现 `web/package-lock.json` 修改或根目录 `package-lock.json` 未跟踪状态。
+主工作树当前有两份既有评测报告修改：
+
+- `server/evaluations/reports/pf002-report.json`
+- `server/evaluations/reports/pf002-report.md`
+
+一次基线评测因 `evaluate:pf002` 脚本硬编码输出目录而重写了这两份文件；没有可安全恢复的备份。不要覆盖、还原或把它们混入无关提交，处理前先人工检查 diff。
+
+前端重构在独立分支 `feat/responsive-apple-workspace` 和独立 worktree 中进行，当前 HEAD 为 `6f2cccc`。截至本次更新，该 worktree 应保持干净；后续实现不要直接落到主工作树。
 
 ### 5.5 当前契约不能回退
 
@@ -292,16 +311,16 @@ PF-001 至 PF-004 已合并为本地提交 `308e3e4`。该提交尚未推送远�
 
 ## 6. 下次开发顺序与注意事项
 
-### 6.1 首要任务：完成发布前验证
+### 6.1 首要任务：完成 V0.1 求职版收口
 
-PF-001 至 PF-004 的代码开发和本地回归已完成。后续聚焦部署前验证：
+PF-001 至 PF-004 的核心代码和本地回归已完成。后续按以下顺序执行：
 
-1. 备份真实 MongoDB，运行所有权迁移 dry-run 并审查 conflict/orphan。
-2. 保存 dry-run 报告和 conflict/orphan ID；无法唯一证明归属的记录继续保留为未归属，不要猜测用户。
-3. 只有在迁移报告经人工确认后，才执行正式迁移。
-4. 验证 Supplement 部分唯一索引是否创建成功；若存在重复 owned 数据，先分析来源，不要直接删除。
-5. 在部署环境执行服务端测试、前端测试、PF-002 固定评测和生产构建。
-6. 完成人工烟测：正常闭环、语义审核不可用、修改验证阻断、风险确认、跨用户访问和 GuidedDemo。
+1. 完成前端 Task 1 的规格复审和代码质量审查；只有双重审查通过后，才能开始 Task 2。
+2. 按响应式实施计划完成 Task 2 至 Task 8，逐任务执行测试先行、规格审查和代码质量审查。
+3. 完成桌面端与移动端关键视口回归、键盘操作、减少动态效果和减少透明度验证。
+4. 补齐 V0.1 求职交付材料：完整 PF-002 评测报告、六要素 Agent 图、产品案例说明、三条简历描述和 V0.1 化 README。
+5. 在公开部署环境执行后端测试、前端测试、PF-002 固定评测、生产构建和人工烟测，并保存可复核证据。
+6. 若公开环境处理真实简历：先备份真实 MongoDB，运行所有权迁移 dry-run，审查 conflict/orphan，再执行正式迁移并验证 Supplement 部分唯一索引。
 
 ### 6.2 修改代码时的边界
 
@@ -328,7 +347,7 @@ PF-001 至 PF-004 的代码开发和本地回归已完成。后续聚焦部署�
 ## 7. 接手验证命令
 
 ```powershell
-cd D:\Code\VitaFix
+cd C:\Users\1\Desktop\精投助手demo
 git status --short
 git log --oneline -15
 
@@ -339,23 +358,82 @@ npm.cmd run evaluate:pf002
 cd ..\web
 npm.cmd test
 npm.cmd run build
+
+cd ..\.worktrees\responsive-apple-workspace\web
+npm.cmd test
+npm.cmd run test:unit
+npm.cmd run build
 ```
 
 预期基线：
 
-- HEAD 为 `308e3e4` 或其后续提交。
+- 主分支 HEAD 为 `e22b86f` 或其后续提交；前端重构分支 HEAD 为 `6f2cccc` 或其后续提交。
 - 后端最近一次已验证为 114/114。
 - PF-002 固定评测最近一次已验证为 42/42。
 - 前端最近一次契约测试为 4/4，Vite 生产构建通过。
-- PF-001 至 PF-004 已提交为 `308e3e4`，预期工作区干净。
+- 响应式 Task 1 最近一次聚焦测试为 9/9、前端契约测试为 13/13，Vite 构建通过。
+- 主工作树预期仍仅显示两份 PF-002 报告的既有修改；前端重构 worktree 预期干净。
+
+注意：当前 `evaluate:pf002` 的 package script 硬编码 `evaluations/reports` 输出目录，追加临时目录参数不会改变实际输出位置。运行前必须先保存或备份待保留的报告内容。
 
 ## 8. 完成定义
 
-只有同时满足以下条件，才能把本轮逻辑加固标记为完成：
+只有同时满足以下条件，才能把 V0.1 求职作品版标记为完成：
 
 - 本文第 4 节三个批次全部完成。
 - 原审查中的最小复现全部转为自动回归测试并通过。
 - PF-001 至 PF-004 的核心验收项逐条复核。
 - PF-002 固定评测无红线失败，并保留版本化报告。
 - 后端全量测试、前端测试和生产构建通过。
+- 响应式重构 Task 1 至 Task 8 全部完成规格审查、代码质量审查和关键视口验证。
+- PF-002 Markdown 报告包含样本、失败案例、修复方式和至少一次前后回归对比。
+- Agent 图明确呈现目标、状态、工具、分支、审核和停止条件，并由 README 链接。
+- 独立产品案例说明、三条基于真实实现与测量结果的简历描述、V0.1 化 README 均已完成。
+- 公开 URL 可访问，部署环境回归和人工烟测证据已留存；不得把本地构建通过等同于公开发布完成。
 - 所有权迁移至少完成 dry-run 审核；若准备部署真实数据，则迁移和索引创建已在备份后验证。
+
+## 9. 2026-08-08 续作进度
+
+### 9.1 Apple 风格响应式重构
+
+设计与实施前置工作：
+
+- 已全局安装 `apple-design` 技能，安装位置为 `C:\Users\1\.agents\skills\apple-design\SKILL.md`。
+- 响应式 Apple workspace 设计已审批，提交为 `5600e09`。
+- 八任务实施计划已审批，提交为 `e22b86f`。
+- 已建立隔离 worktree 和分支 `feat/responsive-apple-workspace`，避免与主工作树中的评测报告修改相互污染。
+
+Task 1 当前状态：
+
+| 检查点 | 状态 | 证据 |
+|---|---|---|
+| 基础实现 | `completed` | `4465f96 feat: establish responsive Apple design foundations` |
+| 首轮规格审查 | `changes_requested` | 发现网格断点、令牌、点击目标、动效与辅助功能降级不完整 |
+| 规格修正 | `completed` | `6f2cccc fix: align responsive foundations with design spec` |
+| 修正后测试 | `passed` | 聚焦测试 9/9、前端契约测试 13/13、Vite 构建成功（380 modules） |
+| 规格复审 | `pending` | 审查在本次文档更新前被中断，尚无最终通过结论 |
+| 代码质量审查 | `pending` | 必须在 Task 2 开始前完成 |
+| Task 2 至 Task 8 | `pending` | 尚未开始 |
+
+不要将 Task 1 描述为已经最终验收。当前准确表述是：实现和规格修正已完成，自动化验证通过，等待规格复审与代码质量审查。
+
+### 9.2 V0.1 求职交付缺口
+
+| 交付项 | 当前状态 | 收口要求 |
+|---|---|---|
+| PF-001 | `code_verified` | 保持现有自动化证据；修正文档中旧的 `in_progress` 冲突 |
+| PF-002 | `code_verified / report_incomplete` | 扩写 Markdown 报告，补样本、失败案例、修复方法和回归对比 |
+| PF-003 | `code_verified` | 保持修改效果与安全状态独立、风险确认和历史记录契约 |
+| PF-004 / GuidedDemo | `local_verified` | 补公开可访问和部署环境烟测证据 |
+| Agent 流程图 | `incomplete` | 补齐目标、状态、工具、分支、审核和停止条件，并从 README 链接 |
+| 产品案例说明 | `missing` | 形成独立案例，讲清问题、决策、边界、实现和结果 |
+| 三条简历描述 | `missing` | 基于真实实现和可复核测量结果撰写 |
+| README | `incomplete` | 更新 PF-001 至 PF-004、`/demo`、测试命令、图与报告链接、截图和隐私边界 |
+| 部署证据 | `blocked` | 验证公开 URL、环境回归和烟测；真实数据场景补迁移与索引证据 |
+| PF-005 | `deferred / not_implemented` | 属于 V0.1 非阻塞项，正式清单中明确延期，不得声称已实现 |
+
+### 9.3 当前可对外使用的结论
+
+可以对外说明：PF-001 至 PF-004 核心逻辑已实现并通过本地自动化基线；Apple 风格响应式重构正在进行。
+
+当前不能对外说明：V0.1 求职作品版已经完成、已经公开发布、已经通过真实数据迁移，或 PF-005 已实现。
