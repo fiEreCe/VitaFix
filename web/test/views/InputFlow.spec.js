@@ -1,16 +1,17 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import JdInput from '../../src/views/JdInput.vue'
 import ResumeInput from '../../src/views/ResumeInput.vue'
 
-const { push, replace, back } = vi.hoisted(() => ({
+const { push, replace, back, resumeUpload } = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
   back: vi.fn(),
+  resumeUpload: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({
@@ -25,7 +26,7 @@ vi.mock('../../src/api', () => ({
   },
   resumeApi: {
     create: vi.fn(),
-    upload: vi.fn(),
+    upload: resumeUpload,
   },
   supplementApi: {
     upsert: vi.fn(),
@@ -41,6 +42,7 @@ describe('input flow semantics', () => {
     push.mockReset()
     replace.mockReset()
     back.mockReset()
+    resumeUpload.mockReset()
   })
 
   async function expectRovingTabs(Component, prefix) {
@@ -110,6 +112,32 @@ describe('input flow semantics', () => {
     expect(source).not.toMatch(/<label[\s\S]*?@keydown/)
     expect(source).toMatch(/<input[\s\S]*?:disabled="uploading"/)
     expect(source).toMatch(/\.drop-zone:focus-within/)
+  })
+
+  it('ignores a dropped file while a resume upload is already pending', async () => {
+    let resolveUpload
+    resumeUpload.mockReturnValue(new Promise((resolve) => {
+      resolveUpload = resolve
+    }))
+
+    const wrapper = mount(ResumeInput)
+    await wrapper.findAll('[role="tab"]')[1].trigger('click')
+
+    const firstFile = new File(['first'], 'first.pdf', { type: 'application/pdf' })
+    const secondFile = new File(['second'], 'second.pdf', { type: 'application/pdf' })
+    const input = wrapper.get('#resume-file')
+    Object.defineProperty(input.element, 'files', { configurable: true, value: [firstFile] })
+
+    await input.trigger('change')
+    expect(resumeUpload).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('label.drop-zone').trigger('drop', {
+      dataTransfer: { files: [secondFile] },
+    })
+    expect(resumeUpload).toHaveBeenCalledTimes(1)
+
+    resolveUpload({ id: 'resume-1', rawText: 'resume', parsed: {} })
+    await flushPromises()
   })
 
   it('uses a named button contract for deleting a supplemental experience', () => {

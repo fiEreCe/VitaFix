@@ -244,6 +244,8 @@ function handleFileSelect(e) {
 
 /** 上传并解析文件 */
 async function uploadFile(file) {
+  if (uploading.value) return
+
   const ext = '.' + file.name.split('.').pop().toLowerCase()
   const allowed = ['.pdf', '.docx', '.doc', '.txt']
   if (!allowed.includes(ext)) {
