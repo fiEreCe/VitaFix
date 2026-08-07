@@ -19,6 +19,7 @@
 
 .adaptive-grid {
   display: grid;
+  min-width: 0;
   grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
 }
@@ -35,13 +36,20 @@
 }
 
 @media (min-width: 56.25rem) {
-  .adaptive-grid {
+  .app-page__main {
+    padding: 2rem;
+    padding-bottom: calc(2rem + var(--safe-bottom));
+  }
+
+  .adaptive-grid--sidebar {
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    align-items: start;
   }
 }
 
 @media (min-width: 75rem) {
-  .adaptive-grid {
+  .adaptive-grid--context {
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--context-width);
+    align-items: start;
   }
 }

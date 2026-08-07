@@ -38,6 +38,19 @@ textarea {
   min-block-size: 44px;
 }
 
+.tap-target {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+
+button,
+[href],
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
@@ -70,6 +83,7 @@ button:active,
   button:hover,
   [role='button']:hover {
     opacity: 0.86;
+    transform: translateY(-1px);
   }
 }
 
@@ -83,8 +97,11 @@ button:active,
     transition-duration: 0.01ms !important;
   }
 
+  .pressable:hover,
   .pressable:active,
+  button:hover,
   button:active,
+  [role='button']:hover,
   [role='button']:active {
     transform: none;
   }
@@ -96,8 +113,8 @@ button:active,
   }
 
   .material {
-    background: var(--surface-content);
-    backdrop-filter: none;
+    background: #fff !important;
+    backdrop-filter: none !important;
   }
 }
 
@@ -107,7 +124,12 @@ button:active,
     --border-strong: #1d1d1f;
   }
 
-  :where(button, input, select, textarea, .material) {
+  :where(button, input, select, textarea) {
     border-color: var(--border-strong);
+  }
+
+  .material {
+    background: #fff !important;
+    border: 1px solid #1d1d1f !important;
   }
 }
