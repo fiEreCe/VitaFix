@@ -1,23 +1,50 @@
 <template>
-  <div class="home">
-    <!-- 顶部品牌区 -->
-    <div class="hero">
-      <div class="hero-icon">🎯</div>
-      <h1 class="hero-title">精投助手</h1>
-      <p class="hero-desc">上传 JD 和简历，AI 分析匹配度</p>
-      <button class="hero-btn" @click="startNewAnalysis">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path d="M9 3.75v10.5M3.75 9h10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        开始新分析
-      </button>
-      <button class="demo-btn" @click="$router.push('/demo')">查看引导演示</button>
-    </div>
+  <AppPage title="精投助手" description="围绕岗位证据，完成一轮可验证的简历分析">
+    <div class="home">
+      <div class="home-grid">
+        <section class="hero" aria-labelledby="home-hero-title">
+          <p class="hero-eyebrow">证据驱动的 AI 求职教练</p>
+          <h2 id="home-hero-title" class="hero-title">让每次简历修改都有依据，也经得起面试追问。</h2>
+          <p class="hero-desc">
+            连接岗位要求与真实经历，在事实审核后给出修改建议，再通过修改验证守住事实安全。
+          </p>
+          <div class="hero-actions">
+            <button
+              type="button"
+              class="hero-btn pressable"
+              data-entry="analysis"
+              @click="startNewAnalysis"
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <path d="M9 3.75v10.5M3.75 9h10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              开始新分析
+            </button>
+            <button
+              type="button"
+              class="demo-btn pressable"
+              data-entry="demo"
+              @click="router.push('/demo')"
+            >
+              查看引导演示
+            </button>
+          </div>
+        </section>
+
+        <aside class="proof-rail" aria-label="核心闭环">
+          <p class="proof-kicker">核心闭环</p>
+          <ol>
+            <li><strong>对齐岗位</strong><span>把 JD 要求拆成可核对的证据点</span></li>
+            <li><strong>核验事实</strong><span>只使用真实经历，避免无法追问的包装</span></li>
+            <li><strong>验证修改</strong><span>复查建议是否清晰、具体且事实安全</span></li>
+          </ol>
+        </aside>
+      </div>
 
     <!-- 历史记录 -->
-    <div class="section">
+      <section class="section" aria-labelledby="history-title">
       <div class="section-header">
-        <h2 class="section-title">历史记录</h2>
+        <h2 id="history-title" class="section-title">历史记录</h2>
         <button v-if="list.length > 0" class="section-more" @click="$router.push('/history')">
           查看全部 &gt;
         </button>
@@ -53,17 +80,18 @@
           </div>
         </div>
       </div>
-    </div>
+      </section>
 
     <!-- 隐私提示 -->
-    <div class="privacy-notice">
+      <div class="privacy-notice">
       <p>
         🔒 你的简历和 JD 数据仅用于本次 AI 分析，7 天后自动删除。
         作为 Demo 项目，开发者可能在调试时看到数据，不会用于其他用途。
         如有疑虑，可在历史记录中手动删除。
       </p>
+      </div>
     </div>
-  </div>
+  </AppPage>
 </template>
 
 <script setup>
@@ -71,6 +99,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { historyApi } from '../api'
 import { formatDate, getGradeColor } from '../utils/format'
+import AppPage from '../components/ui/AppPage.vue'
 
 const router = useRouter()
 const list = ref([])
@@ -94,63 +123,132 @@ function startNewAnalysis() {
 
 <style scoped>
 .home {
-  min-height: 100vh;
-  padding-bottom: 32px;
-  background: var(--bg-page);
+  display: grid;
+  gap: var(--spacing-2xl);
 }
 
-/* Apple Hero */
+.home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--spacing-xl);
+  align-items: stretch;
+}
+
 .hero {
-  padding: 60px 24px 40px;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: clamp(1.5rem, 5vw, 4rem) 0;
 }
 
-.hero-icon {
-  font-size: 56px;
-  margin-bottom: 16px;
+.hero-eyebrow,
+.proof-kicker {
+  margin: 0 0 var(--spacing-md);
+  color: var(--color-primary);
+  font-size: var(--type-caption);
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .hero-title {
-  font-size: 34px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  margin: 0 0 8px;
+  max-width: 16ch;
+  margin: 0;
   color: var(--text-primary);
+  font-size: var(--type-title);
+  font-weight: 700;
+  line-height: 1.16;
+  letter-spacing: -0.025em;
 }
 
 .hero-desc {
-  font-size: 15px;
+  max-width: 42rem;
+  margin: var(--spacing-lg) 0 0;
   color: var(--text-secondary);
-  margin: 0 0 28px;
-  line-height: 1.5;
+  font-size: var(--type-body);
+  line-height: 1.7;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xl);
+}
+
+.hero-btn,
+.demo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  min-height: 2.75rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
 }
 
 .hero-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   background: var(--color-primary);
   color: #fff;
   border: none;
-  border-radius: 24px;
-  padding: 12px 28px;
-  font-size: 16px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  transition: opacity 0.2s, transform 0.15s;
   box-shadow: 0 4px 14px rgba(0, 113, 227, 0.3);
 }
 
-.hero-btn:active {
-  opacity: 0.85;
-  transform: scale(0.97);
+.demo-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-content);
+  color: var(--color-primary);
 }
-.demo-btn{display:block;margin:12px auto 0;background:none;border:0;color:var(--color-primary);font:inherit;cursor:pointer}
+
+.proof-rail {
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-content);
+  box-shadow: var(--shadow-md);
+}
+
+.proof-rail ol {
+  display: grid;
+  gap: var(--spacing-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: proof;
+}
+
+.proof-rail li {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  column-gap: var(--spacing-md);
+  counter-increment: proof;
+}
+
+.proof-rail li::before {
+  content: counter(proof, decimal-leading-zero);
+  grid-row: 1 / span 2;
+  color: var(--color-primary);
+  font-size: var(--type-caption);
+  font-weight: 700;
+}
+
+.proof-rail strong,
+.proof-rail span {
+  grid-column: 2;
+}
+
+.proof-rail span {
+  margin-top: var(--spacing-xs);
+  color: var(--text-secondary);
+  font-size: var(--type-caption);
+  line-height: 1.55;
+}
 
 /* Section */
 .section {
-  padding: 0 20px;
+  min-width: 0;
 }
 
 .section-header {
@@ -169,11 +267,12 @@ function startNewAnalysis() {
 }
 
 .section-more {
+  min-height: 2.75rem;
   font-size: 14px;
   color: var(--color-primary);
   background: none;
   border: none;
-  padding: 0;
+  padding: 0 var(--spacing-sm);
   cursor: pointer;
   font-family: inherit;
 }
@@ -258,7 +357,7 @@ function startNewAnalysis() {
 
 /* Privacy */
 .privacy-notice {
-  margin: 32px 20px 16px;
+  margin: 0;
   padding: 12px 14px;
   background: #f5f5f7;
   border-radius: var(--radius-md);
@@ -270,5 +369,12 @@ function startNewAnalysis() {
 
 .privacy-notice p {
   margin: 0;
+}
+
+@media (min-width: 56.25rem) {
+  .home-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
+    gap: var(--spacing-2xl);
+  }
 }
 </style>

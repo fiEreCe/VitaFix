@@ -1,26 +1,26 @@
 <template>
-  <div class="jd-input">
-    <van-nav-bar
-      title="输入岗位JD"
-      left-arrow
-      @click-left="$router.back()"
-    />
-
-    <div class="content">
+  <AppPage title="输入岗位 JD" description="先确认岗位原文，再进入简历匹配" back @back="$router.back()">
+    <div class="content reading-column">
       <!-- 方式选择 -->
-      <div class="method-tabs">
-        <div
-          :class="['method-tab', { active: method === 'text' }]"
+      <div class="method-tabs" role="tablist" aria-label="输入方式">
+        <button
+          type="button"
+          role="tab"
+          :class="['method-tab', 'pressable', { active: method === 'text' }]"
+          :aria-selected="method === 'text'"
           @click="method = 'text'"
         >
-          <van-icon name="edit" /> 粘贴文本
-        </div>
-        <div
-          :class="['method-tab', { active: method === 'image' }]"
+          <van-icon name="edit" aria-hidden="true" /> 粘贴文本
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :class="['method-tab', 'pressable', { active: method === 'image' }]"
+          :aria-selected="method === 'image'"
           @click="method = 'image'"
         >
-          <van-icon name="photo" /> 截图识别
-        </div>
+          <van-icon name="photo" aria-hidden="true" /> 截图识别
+        </button>
       </div>
 
       <!-- 文本输入 -->
@@ -140,7 +140,7 @@
         </div>
       </div>
     </van-action-sheet>
-  </div>
+  </AppPage>
 </template>
 
 <script setup>
@@ -148,6 +148,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { jdApi } from '../api'
+import AppPage from '../components/ui/AppPage.vue'
 
 const router = useRouter()
 const method = ref('text')
@@ -206,13 +207,8 @@ function goNext() {
 </script>
 
 <style scoped>
-.jd-input {
-  min-height: 100vh;
-  background: var(--bg-page);
-}
-
 .content {
-  padding: 16px;
+  min-width: 0;
 }
 
 .method-tabs {
@@ -224,7 +220,8 @@ function goNext() {
 .method-tab {
   flex: 1;
   text-align: center;
-  padding: 10px;
+  min-height: 2.75rem;
+  padding: 0.625rem;
   background: var(--bg-card);
   border-radius: var(--radius-md);
   font-size: 14px;
@@ -332,13 +329,7 @@ function goNext() {
   color: var(--text-disabled);
 }
 
-/* PC 响应式 */
-@media (min-width: 768px) {
-  .content {
-    max-width: 800px;
-    margin: 0 auto;
-  }
-
+@media (min-width: 56.25rem) {
   .method-tab {
     font-size: 15px;
     padding: 12px;

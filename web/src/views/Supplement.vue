@@ -1,12 +1,6 @@
 <template>
-  <div class="supplement">
-    <van-nav-bar
-      title="补充经历（可选）"
-      left-arrow
-      @click-left="$router.back()"
-    />
-
-    <div class="content">
+  <AppPage title="补充经历（可选）" description="补充简历之外但可以真实说明的经历" back @back="$router.back()">
+    <div class="content reading-column">
       <div class="tip-card">
         <van-icon name="bulb-o" />
         <span>如果你有简历中没有体现的经历（实习、项目、竞赛等），可以在这里补充，AI分析时会纳入考量。</span>
@@ -21,7 +15,14 @@
         >
           <div class="item-header">
             <van-tag :color="typeColor(item.type)" size="small">{{ item.type }}</van-tag>
-            <van-icon name="cross" @click="removeItem(idx)" />
+            <button
+              type="button"
+              class="icon-button tap-target pressable"
+              :aria-label="`删除经历：${item.title}`"
+              @click="removeItem(idx)"
+            >
+              <van-icon name="cross" aria-hidden="true" />
+            </button>
           </div>
           <div class="item-title">{{ item.title }}</div>
           <div v-if="item.period" class="item-period">{{ item.period }}</div>
@@ -93,7 +94,7 @@
         </van-button>
       </div>
     </div>
-  </div>
+  </AppPage>
 </template>
 
 <script setup>
@@ -102,6 +103,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { supplementApi, agentSessionApi } from '../api'
 import { events } from '../utils/analytics'
+import AppPage from '../components/ui/AppPage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -187,13 +189,8 @@ async function startAnalysis() {
 </script>
 
 <style scoped>
-.supplement {
-  min-height: 100vh;
-  background: var(--bg-page);
-}
-
 .content {
-  padding: 16px;
+  min-width: 0;
 }
 
 .tip-card {
@@ -233,6 +230,17 @@ async function startAnalysis() {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 6px;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
 }
 
 .item-title {
