@@ -51,4 +51,12 @@ describe('StatusPanel', () => {
     expect(source).toMatch(/\.status-panel\s*\{[^}]*border-radius:\s*var\(--radius-lg\)/s)
     expect(source).toMatch(/\.status-panel__retry\s*\{[^}]*margin-top:\s*1rem[^}]*min-height:\s*2\.75rem[^}]*padding:\s*0 1\.25rem/s)
   })
+
+  it('uses margins rather than grid gaps for panel spacing', () => {
+    const panelRule = source.match(/\.status-panel\s*\{([^}]*)\}/)?.[1] ?? ''
+
+    expect(panelRule).not.toMatch(/display:\s*grid/)
+    expect(panelRule).not.toMatch(/justify-items:/)
+    expect(panelRule).not.toMatch(/gap:/)
+  })
 })

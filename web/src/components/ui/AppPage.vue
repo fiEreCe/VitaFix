@@ -102,24 +102,20 @@ defineEmits(['back'])
 .app-chrome__title h1 {
   overflow-wrap: anywhere;
   font-size: var(--type-headline);
-  line-height: 1.2;
+  line-height: 1.25;
   letter-spacing: -0.01em;
 }
 
 .app-chrome__eyebrow,
 .app-chrome__description {
+  margin: 0;
   color: var(--text-secondary);
   font-size: var(--type-caption);
   line-height: 1.35;
 }
 
 .app-chrome__eyebrow {
-  margin-bottom: var(--spacing-xs) !important;
   font-weight: 600;
-}
-
-.app-chrome__description {
-  margin-top: var(--spacing-xs) !important;
 }
 
 .app-chrome__actions {
@@ -133,5 +129,8 @@ defineEmits(['back'])
     padding: 1rem 2rem;
   }
 
+  .app-chrome__title h1 {
+    font-size: 1.375rem;
+  }
 }
 </style>

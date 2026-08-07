@@ -48,9 +48,6 @@ const live = computed(() => (props.kind === 'error' ? 'assertive' : 'polite'))
 
 <style scoped>
 .status-panel {
-  display: grid;
-  justify-items: center;
-  gap: var(--spacing-md);
   padding: 2rem;
   text-align: center;
   background: var(--surface-content);

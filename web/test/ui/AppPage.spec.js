@@ -44,4 +44,11 @@ describe('AppPage', () => {
     expect(source).toMatch(/\.icon-button\s*\{[^}]*border:\s*0[^}]*background:\s*var\(--surface-subtle\)[^}]*font-size:\s*1\.75rem[^}]*line-height:\s*1/s)
     expect(source).toMatch(/\.app-chrome__title h1\s*\{[^}]*font-size:\s*var\(--type-headline\)/s)
   })
+
+  it('uses the approved title rhythm at mobile and desktop sizes', () => {
+    expect(source).toMatch(/\.app-chrome__title h1\s*\{[^}]*line-height:\s*1\.25/s)
+    expect(source).toMatch(/@media\s*\(min-width:\s*56\.25rem\)\s*\{[\s\S]*?\.app-chrome__title h1\s*\{[^}]*font-size:\s*1\.375rem/s)
+    expect(source).toMatch(/\.app-chrome__eyebrow,\s*\.app-chrome__description\s*\{[^}]*margin:\s*0/s)
+    expect(source).not.toMatch(/\.app-chrome__(?:eyebrow|description)\s*\{[^}]*margin-(?:top|bottom):[^}]*!important/s)
+  })
 })
