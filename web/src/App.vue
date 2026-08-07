@@ -8,39 +8,8 @@
 
 <style>
 @import url('./styles/variables.css');
-
-* {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  background-color: #f5f5f7;
-  font-family: var(--font-family);
-  color: var(--text-primary);
-}
-
-#app {
-  max-width: 100%;
-  min-height: 100vh;
-}
-
-@media (min-width: 768px) {
-  body {
-    background-color: #e8ebf0;
-  }
-
-  #app {
-    max-width: 480px;
-    margin: 0 auto;
-    min-height: 100vh;
-    background: var(--bg-page);
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.1);
-    position: relative;
-  }
-}
+@import url('./styles/base.css');
+@import url('./styles/layout.css');
 
 /* Vant 组件全局样式覆盖 */
 :root {

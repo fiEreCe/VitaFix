@@ -5,9 +5,19 @@
   --color-warning: #ff9f0a;
   --color-danger: #ff3b30;
 
-  /* 背景色 */
-  --bg-page: #f5f5f7;
-  --bg-card: #ffffff;
+  /* 表面 */
+  --surface-page: #f5f5f7;
+  --surface-content: #ffffff;
+  --surface-subtle: #f0f1f3;
+  --surface-material: rgba(255, 255, 255, 0.82);
+  --surface-selected: #e8f2ff;
+  --bg-page: var(--surface-page);
+  --bg-card: var(--surface-content);
+
+  /* 边框与焦点 */
+  --border-subtle: rgba(29, 29, 31, 0.12);
+  --border-strong: rgba(29, 29, 31, 0.28);
+  --focus-ring: 0 0 0 3px rgba(0, 113, 227, 0.28);
 
   /* 文字色 */
   --text-primary: #1d1d1f;
@@ -28,6 +38,19 @@
   --spacing-xl: 24px;
   --spacing-2xl: 32px;
 
+  /* 动效 */
+  --motion-press: 120ms;
+  --motion-reveal: 180ms;
+  --motion-layout: 260ms;
+  --ease-out-fluid: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 响应式布局 */
+  --workspace-max: 73.75rem;
+  --reading-max: 45rem;
+  --sidebar-width: 18rem;
+  --context-width: 19rem;
+  --safe-bottom: max(1rem, env(safe-area-inset-bottom));
+
   /* 阴影 */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -35,4 +58,9 @@
 
   /* 字体 */
   --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --type-display: clamp(2rem, 1.65rem + 1.5vw, 3rem);
+  --type-title: 1.75rem;
+  --type-headline: 1.25rem;
+  --type-body: 1rem;
+  --type-caption: 0.8125rem;
 }

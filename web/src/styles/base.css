@@ -1,0 +1,113 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  font-family: var(--font-family);
+  font-size: 100%;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-width: 20rem;
+  min-height: 100%;
+  margin: 0;
+  color: var(--text-primary);
+  background: var(--surface-page);
+  font-family: inherit;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+[role='button'],
+input:not([type='hidden']),
+select,
+textarea {
+  min-block-size: 44px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+
+#app {
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+.pressable,
+button,
+[role='button'] {
+  transition:
+    transform var(--motion-press) var(--ease-out-fluid),
+    opacity var(--motion-press) ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pressable:active,
+button:active,
+[role='button']:active {
+  opacity: 0.72;
+  transform: scale(0.98);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pressable:hover,
+  button:hover,
+  [role='button']:hover {
+    opacity: 0.86;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .pressable:active,
+  button:active,
+  [role='button']:active {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --surface-material: #ffffff;
+  }
+
+  .material {
+    background: var(--surface-content);
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --border-subtle: rgba(29, 29, 31, 0.5);
+    --border-strong: #1d1d1f;
+  }
+
+  :where(button, input, select, textarea, .material) {
+    border-color: var(--border-strong);
+  }
+}
