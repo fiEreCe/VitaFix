@@ -62,26 +62,20 @@ select {
   min-height: 100svh;
 }
 
-.pressable,
-button,
-[role='button'] {
+.pressable {
   transition:
     transform var(--motion-press) var(--ease-out-fluid),
     opacity var(--motion-press) ease-out;
   -webkit-tap-highlight-color: transparent;
 }
 
-.pressable:active,
-button:active,
-[role='button']:active {
+.pressable:active {
   opacity: 0.72;
   transform: scale(0.98);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .pressable:hover,
-  button:hover,
-  [role='button']:hover {
+  .pressable:hover {
     opacity: 0.86;
     transform: translateY(-1px);
   }
@@ -98,11 +92,7 @@ button:active,
   }
 
   .pressable:hover,
-  .pressable:active,
-  button:hover,
-  button:active,
-  [role='button']:hover,
-  [role='button']:active {
+  .pressable:active {
     transform: none;
   }
 }

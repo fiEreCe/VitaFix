@@ -83,6 +83,19 @@ test('tap targets and press feedback have accessible pointer and motion behavior
   assert.match(baseCss, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.pressable:hover[\s\S]*?\.pressable:active[^}]*transform:\s*none/s)
 })
 
+test('press feedback is opt-in and does not override component button transforms', () => {
+  const feedbackRules = [...baseCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, , declarations]) => /(?:transition|opacity|transform)\s*:/.test(declarations))
+
+  for (const [rule, selectors] of feedbackRules) {
+    assert.doesNotMatch(
+      selectors,
+      /(?:^|,)\s*(?:button|\[role=['"]button['"]\])(?::(?:hover|active))?\s*(?=,|$)/,
+      `press feedback must be opt-in through .pressable: ${rule.trim()}`,
+    )
+  }
+})
+
 test('material fallbacks use important solid surfaces and borders', () => {
   assert.match(baseCss, /prefers-reduced-transparency:[\s\S]*?\.material\s*\{[^}]*background:\s*#fff\s*!important[^}]*backdrop-filter:\s*none\s*!important/s)
   assert.match(baseCss, /prefers-contrast:\s*more[\s\S]*?\.material\s*\{[^}]*background:\s*#fff\s*!important[^}]*border:\s*1px\s+solid\s+#1d1d1f\s*!important/s)
