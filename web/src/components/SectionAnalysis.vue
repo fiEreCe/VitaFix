@@ -62,10 +62,16 @@
 
     <template v-else>
       <!-- 原文摘要（收起状态，点击展开） -->
-      <div v-if="section.originalText" class="original-toggle" @click="showOriginal = !showOriginal">
+      <button
+        v-if="section.originalText"
+        class="original-toggle"
+        type="button"
+        :aria-expanded="showOriginal"
+        @click="showOriginal = !showOriginal"
+      >
         <span>查看原文</span>
         <van-icon :name="showOriginal ? 'arrow-up' : 'arrow-down'" size="12" />
-      </div>
+      </button>
       <div v-if="showOriginal && section.originalText" class="section-original">
         {{ section.originalText }}
       </div>
@@ -137,7 +143,7 @@
     </div>
 
     <!-- 改进建议 -->
-    <div v-if="section.suggestions?.length" class="suggestions-section">
+    <div v-if="hasNewData && section.suggestions?.length" class="suggestions-section">
       <div class="sub-title">💡 改进建议</div>
       <div
         v-for="(sug, idx) in section.suggestions"
@@ -296,7 +302,7 @@ const summaryCards = computed(() => [
 }
 
 .section-type-badge {
-  font-size: 11px;
+  font-size: var(--type-caption);
   font-weight: 600;
   padding: 2px 8px;
   background: #f0f0f0;
@@ -341,7 +347,7 @@ const summaryCards = computed(() => [
 }
 
 .score-change {
-  font-size: 12px;
+  font-size: var(--type-caption);
   font-weight: 600;
   padding: 4px 8px;
   border-radius: 4px;
@@ -373,7 +379,7 @@ const summaryCards = computed(() => [
 .context-row {
   display: flex;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--type-caption);
   line-height: 1.5;
 }
 
@@ -383,7 +389,7 @@ const summaryCards = computed(() => [
 }
 
 .context-label {
-  font-size: 11px;
+  font-size: var(--type-caption);
   color: var(--text-secondary);
   margin-bottom: 1px;
   font-weight: 500;
@@ -396,16 +402,21 @@ const summaryCards = computed(() => [
 /* 原文切换 */
 .original-toggle {
   margin-top: 8px;
-  font-size: 12px;
+  width: 100%;
+  padding: 0;
+  font-size: var(--type-caption);
   color: var(--color-primary);
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 4px;
+  text-align: left;
+  border: 0;
+  background: transparent;
 }
 
 .section-original {
-  font-size: 12px;
+  font-size: var(--type-caption);
   color: var(--text-secondary);
   line-height: 1.5;
   margin-top: 4px;
@@ -436,7 +447,7 @@ const summaryCards = computed(() => [
 }
 
 .category-label {
-  font-size: 11px;
+  font-size: var(--type-caption);
   font-weight: 600;
   color: var(--text-secondary);
   padding: 3px 8px;
@@ -481,7 +492,7 @@ const summaryCards = computed(() => [
 }
 
 .status-tag {
-  font-size: 10px;
+  font-size: var(--type-caption);
   padding: 1px 6px;
   border-radius: 10px;
   font-weight: 500;
@@ -509,7 +520,7 @@ const summaryCards = computed(() => [
 
 .detail-row {
   display: flex;
-  font-size: 11px;
+  font-size: var(--type-caption);
   line-height: 1.6;
   gap: 6px;
 }
@@ -526,7 +537,7 @@ const summaryCards = computed(() => [
 }
 
 .detail-analysis {
-  font-size: 11px;
+  font-size: var(--type-caption);
   color: var(--text-secondary);
   margin-top: 3px;
   padding: 4px 6px;
@@ -550,13 +561,13 @@ const summaryCards = computed(() => [
   display: flex;
   align-items: flex-start;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--type-caption);
   line-height: 1.4;
 }
 
 .assessment-icon {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--type-caption);
 }
 
 .assessment-label {
@@ -567,7 +578,7 @@ const summaryCards = computed(() => [
 }
 
 .assessment-badge {
-  font-size: 10px;
+  font-size: var(--type-caption);
   padding: 0 5px;
   border-radius: 3px;
   flex-shrink: 0;
@@ -628,13 +639,13 @@ const summaryCards = computed(() => [
 }
 
 .summary-card-title {
-  font-size: 11px;
+  font-size: var(--type-caption);
   font-weight: 600;
   margin-bottom: 4px;
 }
 
 .summary-item {
-  font-size: 11px;
+  font-size: var(--type-caption);
   color: var(--text-secondary);
   line-height: 1.5;
   padding: 1px 0;
@@ -646,7 +657,7 @@ const summaryCards = computed(() => [
 }
 
 .suggestion-item {
-  font-size: 12px;
+  font-size: var(--type-caption);
   color: var(--text-secondary);
   padding: 4px 8px;
   line-height: 1.5;
@@ -661,7 +672,7 @@ const summaryCards = computed(() => [
 }
 
 .mini-label {
-  font-size: 12px;
+  font-size: var(--type-caption);
   font-weight: 500;
   color: var(--color-success);
   margin-bottom: 4px;
@@ -672,7 +683,7 @@ const summaryCards = computed(() => [
 }
 
 .matched-req {
-  font-size: 12px;
+  font-size: var(--type-caption);
   color: var(--text-secondary);
   padding: 2px 0;
 }
