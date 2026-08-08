@@ -70,7 +70,7 @@ function validateSavedEdit() { run(() => agentSessionApi.validate(route.params.i
 function completeWithRisk() { run(() => agentSessionApi.completeWithRisk(route.params.id, task.value.id)) }
 function decide(type) { run(() => agentSessionApi.decide(route.params.id, task.value.id, { type })) }
 function startEdit() { editedText.value = task.value.currentText || task.value.candidate?.text || ''; editMode.value = true }
-function verificationTag(status) { return status === 'passed' ? 'success' : status === 'warning' ? 'warning' : 'danger' }
+function verificationTag(status) { return status === 'passed' ? 'success' : status === 'warning' ? 'warning' : status === 'blocked' ? 'danger' : 'default' }
 function verificationLabel(status) { return ({ passed: '已通过事实校验', warning: '可采用，含风险提示', blocked: '已阻断', unavailable: '校验暂不可用', unverified_user_content: '用户编辑，尚未验证' })[status] || status }
 function verificationHint(status) { return status === 'warning' ? '该表达包含估算信息，请确认后再采用。' : '系统未将该 AI 内容标记为可采用。' }
 function outcomeLabel(status) { return ({ improved: '有明确改善', unchanged: '暂无明显变化', regressed: '效果有所下降', tradeoff: '有改善，也有新问题' })[status] || status }

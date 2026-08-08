@@ -115,6 +115,7 @@ const skipSupplement = computed(() => route.query.skip === '1')
 
 const items = ref([])
 const saving = ref(false)
+const analysisStarting = ref(false)
 
 const form = ref({
   type: '实习',
@@ -126,7 +127,10 @@ const form = ref({
 // 如果标记了跳过，直接开始分析
 onMounted(() => {
   if (skipSupplement.value && resumeId.value && jdId.value) {
-    startAnalysis()
+    saving.value = true
+    startAnalysis().finally(() => {
+      saving.value = false
+    })
   }
 })
 
@@ -173,6 +177,8 @@ async function saveAndAnalyze() {
 }
 
 async function startAnalysis() {
+  if (analysisStarting.value) return
+  analysisStarting.value = true
   try {
     const res = await agentSessionApi.create(jdId.value, resumeId.value)
     await agentSessionApi.start(res.id)
@@ -184,6 +190,8 @@ async function startAnalysis() {
     router.replace(`/agent/${res.id}`)
   } catch (e) {
     showToast('启动分析失败: ' + e.message)
+  } finally {
+    analysisStarting.value = false
   }
 }
 </script>

@@ -4,6 +4,7 @@
       class="dimension-header"
       type="button"
       :aria-expanded="expanded"
+      :aria-controls="detailId"
       @click="expanded = !expanded"
     >
       <span class="dimension-name">{{ dimension.name }}</span>
@@ -24,7 +25,7 @@
 
     <div v-if="dimension.detail" class="dimension-detail">{{ dimension.detail }}</div>
 
-    <template v-if="expanded">
+    <div v-if="expanded" :id="detailId">
       <div v-if="dimension.matchedItems?.length" class="dimension-list">
         <div class="list-label">匹配项</div>
         <div v-for="(item, idx) in dimension.matchedItems" :key="idx" class="list-item">
@@ -40,7 +41,7 @@
           <div class="list-item-desc">{{ item.suggestion }}</div>
         </div>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -57,6 +58,9 @@ const props = defineProps({
 const expanded = ref(false)
 const scoreColor = computed(() => getGradeColor(props.dimension.score || 0))
 const normalizedScore = computed(() => Math.min(Math.max(props.dimension.score || 0, 0), 100) / 100)
+const detailId = computed(() =>
+  'dimension-detail-' + String(props.dimension.name || '').replace(/\s+/g, '-')
+)
 </script>
 
 <style scoped>

@@ -280,4 +280,24 @@ describe('result and history workspaces', () => {
       item.text() === '补充个人行动与结果'
     )).toHaveLength(1)
   })
+
+  it('offers an accessible button to edit a section', async () => {
+    const section = mount(SectionAnalysis, {
+      props: {
+        section: {
+          sectionType: 'experience',
+          sectionIndex: 0,
+          label: '项目经历',
+          matchScore: 65,
+          originalText: '参与产品设计并跟进上线。',
+        },
+      },
+    })
+
+    const edit = section.get('button[aria-label^="编辑板块"]')
+    expect(edit.attributes('aria-label')).toContain('项目经历')
+
+    await edit.trigger('click')
+    expect(section.find('.edit-textarea').exists()).toBe(true)
+  })
 })

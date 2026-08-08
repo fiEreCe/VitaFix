@@ -344,7 +344,7 @@ function formatFileSize(bytes) {
   color: var(--text-secondary);
   cursor: pointer;
   border: 1px solid transparent;
-  transition: all 0.2s;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
 }
 
 .method-tab.active {
@@ -382,7 +382,7 @@ function formatFileSize(bytes) {
   padding: 48px 24px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.2s, background-color 0.2s;
   background: var(--bg-card);
 }
 

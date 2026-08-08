@@ -7,15 +7,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import JdInput from '../../src/views/JdInput.vue'
 import ResumeInput from '../../src/views/ResumeInput.vue'
 
-const { push, replace, back, resumeUpload } = vi.hoisted(() => ({
+const {
+  push,
+  replace,
+  back,
+  resumeUpload,
+  agentCreate,
+  agentStart,
+  routeQuery,
+} = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
   back: vi.fn(),
   resumeUpload: vi.fn(),
+  agentCreate: vi.fn(),
+  agentStart: vi.fn(),
+  routeQuery: { jdId: 'jd-1' },
 }))
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: { jdId: 'jd-1' } }),
+  useRoute: () => ({ query: routeQuery }),
   useRouter: () => ({ push, replace, back }),
 }))
 
@@ -32,8 +43,8 @@ vi.mock('../../src/api', () => ({
     upsert: vi.fn(),
   },
   agentSessionApi: {
-    create: vi.fn(),
-    start: vi.fn(),
+    create: agentCreate,
+    start: agentStart,
   },
 }))
 
@@ -43,6 +54,10 @@ describe('input flow semantics', () => {
     replace.mockReset()
     back.mockReset()
     resumeUpload.mockReset()
+    agentCreate.mockReset()
+    agentStart.mockReset()
+    Object.keys(routeQuery).forEach((key) => delete routeQuery[key])
+    routeQuery.jdId = 'jd-1'
   })
 
   async function expectRovingTabs(Component, prefix) {
@@ -145,5 +160,32 @@ describe('input flow semantics', () => {
 
     expect(source).toMatch(/<button[\s\S]*?:aria-label="`删除经历：\$\{item\.title\}`"[\s\S]*?@click="removeItem\(idx\)"/)
     expect(source).toMatch(/<van-icon\s+name="cross"\s+aria-hidden="true"/)
+  })
+
+  it('does not start a second analysis while skip auto-start is in flight', async () => {
+    let resolveCreate
+    agentCreate.mockReturnValue(new Promise((resolve) => {
+      resolveCreate = resolve
+    }))
+    routeQuery.jdId = 'jd-1'
+    routeQuery.resumeId = 'resume-1'
+    routeQuery.skip = '1'
+
+    const { default: Supplement } = await import('../../src/views/Supplement.vue')
+    const wrapper = mount(Supplement)
+    await flushPromises()
+    expect(agentCreate).toHaveBeenCalledTimes(1)
+
+    await wrapper.vm.startAnalysis()
+    await flushPromises()
+    expect(agentCreate).toHaveBeenCalledTimes(1)
+
+    resolveCreate({ id: 'session-1' })
+    await flushPromises()
+    expect(agentStart).toHaveBeenCalledTimes(1)
+    expect(replace).toHaveBeenCalledWith('/agent/session-1')
+    expect(agentCreate).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
   })
 })

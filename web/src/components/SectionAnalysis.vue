@@ -4,14 +4,15 @@
     <div class="section-header">
       <div class="section-type-badge">{{ typeLabel }}</div>
       <span class="section-label">{{ section.label }}</span>
-      <van-icon
+      <button
         v-if="!isEditing"
-        name="edit"
-        size="16"
-        color="#1989fa"
-        class="edit-trigger"
+        type="button"
+        class="icon-button tap-target pressable edit-trigger"
+        :aria-label="`编辑板块：${section.label}`"
         @click="startEdit"
-      />
+      >
+        <van-icon name="edit" size="16" color="#1989fa" aria-hidden="true" />
+      </button>
       <span class="section-score" :style="{ color: scoreColor }">{{ section.matchScore }}分</span>
     </div>
 
@@ -64,15 +65,20 @@
       <!-- 原文摘要（收起状态，点击展开） -->
       <button
         v-if="section.originalText"
-        class="original-toggle"
+        class="original-toggle pressable"
         type="button"
         :aria-expanded="showOriginal"
+        :aria-controls="'section-original-' + section.sectionType + '-' + section.sectionIndex"
         @click="showOriginal = !showOriginal"
       >
         <span>查看原文</span>
-        <van-icon :name="showOriginal ? 'arrow-up' : 'arrow-down'" size="12" />
+        <van-icon :name="showOriginal ? 'arrow-up' : 'arrow-down'" size="12" aria-hidden="true" />
       </button>
-      <div v-if="showOriginal && section.originalText" class="section-original">
+      <div
+        v-if="showOriginal && section.originalText"
+        :id="'section-original-' + section.sectionType + '-' + section.sectionIndex"
+        class="section-original"
+      >
         {{ section.originalText }}
       </div>
     </template>
@@ -328,8 +334,17 @@ const summaryCards = computed(() => [
 }
 
 .edit-trigger {
-  cursor: pointer;
   flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  margin-left: -0.5rem;
 }
 
 /* 编辑模式 */
