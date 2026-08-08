@@ -38,7 +38,7 @@ related_docs:
 - V0.1 求职作品版仍未完成：评测报告、Agent 图、产品案例、三条简历描述、README 和部署证据尚未全部达到交付标准。
 - Apple 风格响应式前端重构 Task 1 至 Task 8 已全部完成。Task 1 至 Task 4 已提交并双审通过；Task 5、Task 6、Task 7 已提交（`eec3598`、`0e688d2`、`25766fc`）；Task 8 集成审计已完成（八项验收标准全部满足，两位独立审查者 0 Critical、1 Important 已修复并提交 `467b55f`）。
 - 求职交付材料已收口：PF-002 评测报告（脚本增强后生成，含样本/失败案例/修复方式/前后回归对比）、六要素 Agent 图、产品案例说明、三条简历描述、V0.1 化 README、Task 8 审计记录均已落地并由 README 链接。
-- 所有权迁移 dry-run 已在真实 MongoDB 执行完成：0 冲突、15 条孤立记录（7 JD + 5 Resume + 3 Supplement）待归属回填；正式迁移待数据库备份确认后执行。
+- 所有权迁移已在真实 MongoDB 完成：dry-run + 正式迁移均执行（0 冲突、15 条孤立记录按设计保留），Supplement 部分唯一索引已验证存在。
 - 在公开部署验证完成前，不应宣称 V0.1 已发布；在真实 MongoDB 迁移 dry-run、索引验证和部署验证完成前，不应公开处理真实简历。
 
 当前结论：
@@ -50,8 +50,8 @@ related_docs:
 | 功能提交 | `completed` | `308e3e4 feat: complete PF001-PF004 logic hardening` |
 | Apple 响应式重构 | `completed` | Task 1 至 Task 8 全部完成并提交；Task 8 集成审计通过 |
 | 求职交付材料 | `completed` | PF-002 报告、Agent 图、案例、简历描述、README、审计记录均已收口 |
-| 真实数据迁移 | `dry_run_completed` | dry-run 完成（0 冲突、15 孤立）；正式迁移待备份确认 |
-| 发布就绪 | `blocked` | 待正式迁移（需备份确认）与公开环境回归/人工烟测 |
+| 真实数据迁移 | `completed` | dry-run + 正式迁移完成（0 冲突、15 孤立保留）；Supplement 部分唯一索引已验证 |
+| 发布就绪 | `blocked` | 迁移与索引已验证；仅剩公开环境回归与人工烟测 |
 
 文档头部继续保留 `status: in_progress`，表示发布交接尚未结束，不表示 PF-001 至 PF-004 的代码仍未完成。
 
@@ -265,21 +265,22 @@ PF-003 已完成：
 
 ## 5. 已知运行和发布事项
 
-### 5.1 旧数据迁移尚未在真实 MongoDB 执行
+### 5.1 旧数据所有权迁移已在真实 MongoDB 执行
 
-代码和注入式测试已完成，但尚未对真实数据库执行。部署前按顺序运行：
+2026-08-08 在确认备份后执行：先 dry-run 再正式迁移。结果：
 
-```powershell
-cd server
-npm.cmd run migrate:ownership:dry
-npm.cmd run migrate:ownership
-```
+- **dry-run**：0 冲突、15 条孤立记录（7 JD + 5 Resume + 3 Supplement）。
+- **正式迁移**（`dryRun:false`）：`updated: 0`、`conflicts: 0`、`orphaned: 15`。孤立记录无法唯一确定归属，按设计安全保留，未批量归给任一用户。
+- 15 条孤立 ID 需留存用于后续人工处理，不得直接删除。
 
-执行前应备份数据库。dry-run 报告中的 conflict 和 orphan ID 需要留存；不得手工把冲突数据批量归给任一用户。
+### 5.2 Supplement 唯一索引已在真实数据上验证
 
-### 5.2 Supplement 唯一索引尚未在真实数据上验证
+已连接真实 MongoDB 检查 `supplements` 集合索引：
 
-Schema 使用部分唯一索引保证同一用户和 Resume 只有一个 Supplement。部署时需要观察 MongoDB 索引创建结果；若已有重复 owned 数据，应先根据迁移报告处理，不能直接删除记录。
+- `userId_1`（userId 普通索引）。
+- `userId_1_resumeId_1`：`unique: true`，`partialFilterExpression: { userId: { $type: 'string' } }` 部分唯一索引已创建成功。
+
+迁移 0 冲突，说明不存在同 owner+resume 的重复 owned 数据，索引创建无阻碍。
 
 ### 5.3 当前身份仍是设备 ID
 
@@ -319,10 +320,10 @@ Schema 使用部分唯一索引保证同一用户和 Resume 只有一个 Supplem
 5. ✅ 求职交付材料收口：PF-002 评测报告（增强脚本生成）、六要素 Agent 图、产品案例、三条简历描述、V0.1 化 README、Task 8 审计记录，均由 README 链接。
 6. ✅ 所有权迁移 dry-run 已执行：0 冲突、15 条孤立记录待回填。
 
-**剩余发布阻塞项（需人工/外部环境）：**
+**剩余发布阻塞项（需外部环境）：**
 
-- 在公开部署环境执行回归和人工烟测并保存可复核证据；本地已做生产构建 preview 烟测（HTTP 200）。
-- 正式所有权迁移：需先确认数据库备份，再运行 `npm.cmd run migrate:ownership`，随后验证 Supplement 部分唯一索引创建。
+- 在公开部署环境执行回归和人工烟测并保存可复核证据；本地已做生产构建 preview 烟测（HTTP 200）。当前无公开部署环境，保持 blocked。
+- ✅ 正式所有权迁移已在确认备份后执行（0 更新、0 冲突、15 孤立保留），Supplement 部分唯一索引已验证存在。
 
 ### 6.2 修改代码时的边界
 
@@ -391,7 +392,7 @@ npm.cmd run build
 - ✅ Agent 图明确呈现目标、状态、工具、分支、审核和停止条件，并由 README 链接。
 - ✅ 独立产品案例说明、三条基于真实实现与测量结果的简历描述、V0.1 化 README 均已完成。
 - ⏳ 公开 URL 可访问，部署环境回归和人工烟测证据已留存（本地生产 preview 烟测已通过，公开环境待执行）；不得把本地构建通过等同于公开发布完成。
-- ✅ 所有权迁移已完成 dry-run 审核（0 冲突、15 孤立）；⏳ 若准备部署真实数据，正式迁移和索引创建需在备份后验证。
+- ✅ 所有权迁移已完成 dry-run + 正式迁移（0 冲突、15 孤立保留）；✅ Supplement 部分唯一索引已在备份后验证存在。
 
 ## 9. 2026-08-08 续作进度
 
@@ -441,7 +442,7 @@ npm.cmd run build
 
 可以对外说明：PF-001 至 PF-004 核心逻辑已实现并通过本地自动化基线；Apple 风格响应式重构 Task 1 至 Task 8 全部完成并通过集成审计；V0.1 求职交付材料（评测报告、Agent 图、案例、简历描述、README）已收口。
 
-当前不能对外说明：V0.1 求职作品版已经公开发布、已经完成正式数据迁移，或 PF-005 已实现。真实 MongoDB 迁移仅完成 dry-run（0 冲突、15 孤立待回填），正式迁移与公开部署验证仍待执行。
+当前不能对外说明：V0.1 求职作品版已经公开发布，或 PF-005 已实现。真实 MongoDB 所有权迁移与 Supplement 索引验证已完成；公开部署回归与人工烟测仍待执行。
 
 ### 9.4 本轮开发遇到的问题与堵点
 
@@ -461,7 +462,7 @@ npm.cmd run build
 2. **Playwright 默认 webServer teardown 在当前 sandbox 挂起。** 所有断言完成后日志停在 `pw:webserver Terminating the WebServer`；最小复现和 Playwright Windows 源码确认其等待 `taskkill /T /F`，而受管 sandbox 阻止该子树终止。最终配置仍保留默认 `webServer` 和 `reuseExistingServer:false`；本地验证使用工具托管 Vite，并设置 `NO_WEBSERVER=1`，Playwright 可正常 exit 0。不要把该环境限制误判为页面或测试泄漏。
 3. ~~**Task 7 最终复审尚未完成。**~~ 已解决：Task 7 最终规格与代码质量复审通过并提交 `25766fc`。
 4. **主工作树两份 PF-002 报告已由增强脚本重生成。** 已验证差异仅为 `generatedAt` 时间戳（内容 42/42 稳定），扩写后的 Markdown 报告已作为交付材料提交；后续运行 `evaluate:pf002` 前仍需备份以保留历史版本。
-5. **真实数据库与公开部署仍未验证。** 所有权迁移 dry-run 已完成（0 冲突、15 孤立记录）；Supplement 唯一索引、公开 URL 回归和人工烟测仍是发布阻塞项，正式迁移需先确认数据库备份。
+5. **真实数据库已验证，公开部署仍待验证。** 所有权迁移（dry-run + 正式）与 Supplement 部分唯一索引已在真实 MongoDB 验证完成；公开 URL 回归和人工烟测仍是发布阻塞项。
 
 ### 9.5 响应式分支已提交记录
 
