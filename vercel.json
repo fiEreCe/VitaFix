@@ -4,6 +4,10 @@
   "installCommand": "cd web && npm install",
   "buildCommand": "cd web && npm run build",
   "outputDirectory": "web/dist",
+  "functions": {
+    "api/resume/upload.js": { "maxDuration": 30 },
+    "api/jd/ocr.js": { "maxDuration": 30 }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
