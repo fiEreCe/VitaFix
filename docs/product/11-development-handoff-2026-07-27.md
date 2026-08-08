@@ -36,7 +36,9 @@ related_docs:
 - PF-004 的真实 fixture 契约、演示漏斗隔离、结构化错误展示和最终全链路回归已完成。
 - PF-001 至 PF-004 已完成代码级验收，既有本地基线仍为后端 114/114、PF-002 固定评测 42/42、前端 4/4 和生产构建通过。
 - V0.1 求职作品版仍未完成：评测报告、Agent 图、产品案例、三条简历描述、README 和部署证据尚未全部达到交付标准。
-- Apple 风格响应式前端重构已经完成设计和详细计划审批，并在隔离 worktree 中完成 Task 1 的实现与规格修正；规格复审和代码质量审查尚未完成，Task 2 至 Task 8 尚未开始。
+- Apple 风格响应式前端重构 Task 1 至 Task 8 已全部完成。Task 1 至 Task 4 已提交并双审通过；Task 5、Task 6、Task 7 已提交（`eec3598`、`0e688d2`、`25766fc`）；Task 8 集成审计已完成（八项验收标准全部满足，两位独立审查者 0 Critical、1 Important 已修复并提交 `467b55f`）。
+- 求职交付材料已收口：PF-002 评测报告（脚本增强后生成，含样本/失败案例/修复方式/前后回归对比）、六要素 Agent 图、产品案例说明、三条简历描述、V0.1 化 README、Task 8 审计记录均已落地并由 README 链接。
+- 所有权迁移 dry-run 已在真实 MongoDB 执行完成：0 冲突、15 条孤立记录（7 JD + 5 Resume + 3 Supplement）待归属回填；正式迁移待数据库备份确认后执行。
 - 在公开部署验证完成前，不应宣称 V0.1 已发布；在真实 MongoDB 迁移 dry-run、索引验证和部署验证完成前，不应公开处理真实简历。
 
 当前结论：
@@ -46,10 +48,10 @@ related_docs:
 | PF-001 至 PF-004 代码开发 | `completed` | 三个开发批次和自动化回归均已完成 |
 | 本地质量门禁 | `passed` | 后端 114/114、PF-002 评测 42/42、前端 4/4、生产构建通过 |
 | 功能提交 | `completed` | `308e3e4 feat: complete PF001-PF004 logic hardening` |
-| Apple 响应式重构 | `in_progress` | Task 1 已实现并修正规格偏差，复审待完成；Task 2 至 Task 8 待开发 |
-| 求职交付材料 | `blocked` | 评测报告、Agent 图、案例说明、简历描述和 README 尚未收口 |
-| 真实数据迁移 | `pending` | 尚未运行真实 MongoDB dry-run 和正式迁移 |
-| 发布就绪 | `blocked` | 等待前端重构、求职交付材料、公开环境烟测；真实数据场景还需迁移与索引验证 |
+| Apple 响应式重构 | `completed` | Task 1 至 Task 8 全部完成并提交；Task 8 集成审计通过 |
+| 求职交付材料 | `completed` | PF-002 报告、Agent 图、案例、简历描述、README、审计记录均已收口 |
+| 真实数据迁移 | `dry_run_completed` | dry-run 完成（0 冲突、15 孤立）；正式迁移待备份确认 |
+| 发布就绪 | `blocked` | 待正式迁移（需备份确认）与公开环境回归/人工烟测 |
 
 文档头部继续保留 `status: in_progress`，表示发布交接尚未结束，不表示 PF-001 至 PF-004 的代码仍未完成。
 
@@ -58,9 +60,9 @@ related_docs:
 | 项目 | 当前值 |
 |---|---|
 | 主工作树 | `C:\Users\1\Desktop\精投助手demo` |
-| 主分支 / HEAD | `main` / `e22b86f` |
+| 主分支 / HEAD | `main` / `d76ce29` |
 | 前端重构 worktree | `C:\Users\1\Desktop\精投助手demo\.worktrees\responsive-apple-workspace` |
-| 前端重构分支 / HEAD | `feat/responsive-apple-workspace` / `6f2cccc` |
+| 前端重构分支 / HEAD | `feat/responsive-apple-workspace` / `467b55f` |
 | PF-001 至 PF-004 功能基线 | `308e3e4` |
 | 设计文档 | `docs/superpowers/specs/2026-07-26-pf001-pf004-logic-hardening-design.md` |
 | 原详细计划 | `docs/superpowers/plans/2026-07-26-pf001-pf004-logic-hardening.md` |
@@ -285,16 +287,11 @@ Schema 使用部分唯一索引保证同一用户和 Resume 只有一个 Supplem
 
 ### 5.4 当前工作区状态
 
-主分支当前 HEAD 为 `e22b86f docs: plan responsive Apple workspace implementation`。PF-001 至 PF-004 功能基线 `308e3e4` 已包含在主分支历史中。
+主分支当前 HEAD 为 `d76ce29 docs: refresh v0.1 development handoff`。PF-001 至 PF-004 功能基线 `308e3e4` 已包含在主分支历史中。本轮新增的求职交付材料（README、`docs/product/portfolio-*.md`、Task 8 审计记录、增强后的 `run-pf002-evaluation.js` 与扩写报告、`docs/product/assets/v01-*.png` 截图）将作为主分支的交付提交。
 
-主工作树当前有两份既有评测报告修改：
+主工作树两份 PF-002 报告已由增强后的评测脚本重生成：差异经人工比较仅为 `generatedAt` 时间戳（内容 42/42 稳定），Markdown 报告已扩写为交付版本。后续运行 `evaluate:pf002` 前仍需备份以保留历史版本。
 
-- `server/evaluations/reports/pf002-report.json`
-- `server/evaluations/reports/pf002-report.md`
-
-一次基线评测因 `evaluate:pf002` 脚本硬编码输出目录而重写了这两份文件；没有可安全恢复的备份。不要覆盖、还原或把它们混入无关提交，处理前先人工检查 diff。
-
-前端重构在独立分支 `feat/responsive-apple-workspace` 和独立 worktree 中进行，当前 HEAD 为 `6f2cccc`。截至本次更新，该 worktree 应保持干净；后续实现不要直接落到主工作树。
+前端重构在独立分支 `feat/responsive-apple-workspace` 和独立 worktree 中进行，HEAD 为 `467b55f`。Task 5 至 Task 8 全部改动已分提交，worktree 干净。前端实现不得直接落到主工作树。
 
 ### 5.5 当前契约不能回退
 
@@ -313,14 +310,19 @@ Schema 使用部分唯一索引保证同一用户和 Resume 只有一个 Supplem
 
 ### 6.1 首要任务：完成 V0.1 求职版收口
 
-PF-001 至 PF-004 的核心代码和本地回归已完成。后续按以下顺序执行：
+截至 2026-08-08，步骤 1 至 5 已完成：
 
-1. 完成前端 Task 1 的规格复审和代码质量审查；只有双重审查通过后，才能开始 Task 2。
-2. 按响应式实施计划完成 Task 2 至 Task 8，逐任务执行测试先行、规格审查和代码质量审查。
-3. 完成桌面端与移动端关键视口回归、键盘操作、减少动态效果和减少透明度验证。
-4. 补齐 V0.1 求职交付材料：完整 PF-002 评测报告、六要素 Agent 图、产品案例说明、三条简历描述和 V0.1 化 README。
-5. 在公开部署环境执行后端测试、前端测试、PF-002 固定评测、生产构建和人工烟测，并保存可复核证据。
-6. 若公开环境处理真实简历：先备份真实 MongoDB，运行所有权迁移 dry-run，审查 conflict/orphan，再执行正式迁移并验证 Supplement 部分唯一索引。
+1. ✅ Task 7 最终规格复审和代码质量复审通过，提交 `25766fc`。
+2. ✅ Task 5/6/7 按精确文件边界分提交（`eec3598`、`0e688d2`、`25766fc`）。
+3. ✅ Task 8 集成审计完成：八项验收标准全部满足，两位独立审查者 0 Critical、1 Important 已修复，提交 `467b55f`。
+4. ✅ 全量回归通过：后端 114/114、PF-002 42/42、前端契约 15 + 单元 38、E2E 31 通过/8 按设计跳过/0 失败、Vite 构建通过、`git diff --check` 干净。
+5. ✅ 求职交付材料收口：PF-002 评测报告（增强脚本生成）、六要素 Agent 图、产品案例、三条简历描述、V0.1 化 README、Task 8 审计记录，均由 README 链接。
+6. ✅ 所有权迁移 dry-run 已执行：0 冲突、15 条孤立记录待回填。
+
+**剩余发布阻塞项（需人工/外部环境）：**
+
+- 在公开部署环境执行回归和人工烟测并保存可复核证据；本地已做生产构建 preview 烟测（HTTP 200）。
+- 正式所有权迁移：需先确认数据库备份，再运行 `npm.cmd run migrate:ownership`，随后验证 Supplement 部分唯一索引创建。
 
 ### 6.2 修改代码时的边界
 
@@ -365,32 +367,31 @@ npm.cmd run test:unit
 npm.cmd run build
 ```
 
-预期基线：
+预期基线（2026-08-08 最新验证）：
 
-- 主分支 HEAD 为 `e22b86f` 或其后续提交；前端重构分支 HEAD 为 `6f2cccc` 或其后续提交。
-- 后端最近一次已验证为 114/114。
-- PF-002 固定评测最近一次已验证为 42/42。
-- 前端最近一次契约测试为 4/4，Vite 生产构建通过。
-- 响应式 Task 1 最近一次聚焦测试为 9/9、前端契约测试为 13/13，Vite 构建通过。
-- 主工作树预期仍仅显示两份 PF-002 报告的既有修改；前端重构 worktree 预期干净。
+- 主分支 HEAD 为 `d76ce29` 或其后续提交；前端重构分支 HEAD 为 `467b55f`，worktree 干净。
+- 后端 114/114。
+- PF-002 固定评测 42/42（版本化报告已扩写为交付版）。
+- 前端 Node 契约 15/15、Vitest 38/38、E2E 31 passed、8 expected skipped、0 failed、Vite 生产构建通过。
+- 主工作树预期显示交付材料改动（README、`docs/product/portfolio-*.md`、审计记录、评测脚本/报告、截图）与已更新的本交接文档。
 
 注意：当前 `evaluate:pf002` 的 package script 硬编码 `evaluations/reports` 输出目录，追加临时目录参数不会改变实际输出位置。运行前必须先保存或备份待保留的报告内容。
 
 ## 8. 完成定义
 
-只有同时满足以下条件，才能把 V0.1 求职作品版标记为完成：
+截至 2026-08-08 的完成度核验（✅ 已满足，⏳ 待外部环境/人工）：
 
-- 本文第 4 节三个批次全部完成。
-- 原审查中的最小复现全部转为自动回归测试并通过。
-- PF-001 至 PF-004 的核心验收项逐条复核。
-- PF-002 固定评测无红线失败，并保留版本化报告。
-- 后端全量测试、前端测试和生产构建通过。
-- 响应式重构 Task 1 至 Task 8 全部完成规格审查、代码质量审查和关键视口验证。
-- PF-002 Markdown 报告包含样本、失败案例、修复方式和至少一次前后回归对比。
-- Agent 图明确呈现目标、状态、工具、分支、审核和停止条件，并由 README 链接。
-- 独立产品案例说明、三条基于真实实现与测量结果的简历描述、V0.1 化 README 均已完成。
-- 公开 URL 可访问，部署环境回归和人工烟测证据已留存；不得把本地构建通过等同于公开发布完成。
-- 所有权迁移至少完成 dry-run 审核；若准备部署真实数据，则迁移和索引创建已在备份后验证。
+- ✅ 本文第 4 节三个批次全部完成。
+- ✅ 原审查中的最小复现全部转为自动回归测试并通过。
+- ✅ PF-001 至 PF-004 的核心验收项逐条复核。
+- ✅ PF-002 固定评测无红线失败，并保留版本化报告（已扩写）。
+- ✅ 后端全量测试、前端测试和生产构建通过。
+- ✅ 响应式重构 Task 1 至 Task 8 全部完成规格审查、代码质量审查和关键视口验证。
+- ✅ PF-002 Markdown 报告包含样本、失败案例、修复方式和至少一次前后回归对比。
+- ✅ Agent 图明确呈现目标、状态、工具、分支、审核和停止条件，并由 README 链接。
+- ✅ 独立产品案例说明、三条基于真实实现与测量结果的简历描述、V0.1 化 README 均已完成。
+- ⏳ 公开 URL 可访问，部署环境回归和人工烟测证据已留存（本地生产 preview 烟测已通过，公开环境待执行）；不得把本地构建通过等同于公开发布完成。
+- ✅ 所有权迁移已完成 dry-run 审核（0 冲突、15 孤立）；⏳ 若准备部署真实数据，正式迁移和索引创建需在备份后验证。
 
 ## 9. 2026-08-08 续作进度
 
@@ -403,37 +404,77 @@ npm.cmd run build
 - 八任务实施计划已审批，提交为 `e22b86f`。
 - 已建立隔离 worktree 和分支 `feat/responsive-apple-workspace`，避免与主工作树中的评测报告修改相互污染。
 
-Task 1 当前状态：
+本轮继续采用“实现 Agent → 规格审查 Agent → 代码质量审查 Agent → 独立测试 Agent”的工作方式。每个发现均先写最小失败测试，再修改生产代码；规格问题未关闭前不进入质量审查，Critical/Important 未关闭前不进入下一任务。
 
-| 检查点 | 状态 | 证据 |
+当前任务状态：
+
+| 任务 | 状态 | 提交 / 证据 |
 |---|---|---|
-| 基础实现 | `completed` | `4465f96 feat: establish responsive Apple design foundations` |
-| 首轮规格审查 | `changes_requested` | 发现网格断点、令牌、点击目标、动效与辅助功能降级不完整 |
-| 规格修正 | `completed` | `6f2cccc fix: align responsive foundations with design spec` |
-| 修正后测试 | `passed` | 聚焦测试 9/9、前端契约测试 13/13、Vite 构建成功（380 modules） |
-| 规格复审 | `pending` | 审查在本次文档更新前被中断，尚无最终通过结论 |
-| 代码质量审查 | `pending` | 必须在 Task 2 开始前完成 |
-| Task 2 至 Task 8 | `pending` | 尚未开始 |
+| Task 1 响应式基础 | `completed / committed / reviewed` | `4465f96`、`6f2cccc`、`d270429`；修复全局按钮 transform 副作用和 jsdom Node 兼容性；最终规格与质量审查通过 |
+| Task 2 共享页面与状态表面 | `completed / committed / reviewed` | `7716d0c`、`a59678e`、`714c61c`；AppPage/StatusPanel 单测 9/9，双审通过 |
+| Task 3 首页和输入流程 | `completed / committed / reviewed` | `b3a4c77`、`62c7692`、`928d1f3`；修复完整 tabs 键盘模式、上传单焦点与并发 guard、历史 RouterLink；双审通过 |
+| Task 4 Agent 工作台 | `completed / committed / reviewed` | `3b09080`、`dee917c`、`7d4c6d8`；补齐完整状态标签、currentTaskId 恢复、首项回退和 busy 串行化；前端 22/22、服务端聚焦 25/25，双审通过 |
+| Task 5 结果、历史和旧组件 | `completed / committed / reviewed` | `eec3598`；目标 10/10、contracts 14/14、Vitest 32/32、构建通过；双审通过 |
+| Task 6 GuidedDemo | `completed / committed / reviewed` | `0e688d2`；GuidedDemo 4/4、contracts 15/15、web 51/51、PF-004 1/1、构建通过；双审通过 |
+| Task 7 浏览器证据 | `completed / committed / final_review_passed` | `25766fc`；最终规格与代码质量复审通过；最新运行 31 passed、8 expected skipped、0 failed；24 张截图证据 |
+| Task 8 集成审计 | `completed / committed` | `467b55f`；八项验收标准全部满足，两位独立审查者 0 Critical、1 Important 已修复，4 个 Minor 已修、4 个 Minor 记录留后续 |
 
-不要将 Task 1 描述为已经最终验收。当前准确表述是：实现和规格修正已完成，自动化验证通过，等待规格复审与代码质量审查。
+前端重构当前准确结论：Task 1 至 Task 8 已全部实现、验证、双审并分提交。响应式重构八任务全部完成，集成审计通过；不得描述为"已公开发布"。
 
 ### 9.2 V0.1 求职交付缺口
 
 | 交付项 | 当前状态 | 收口要求 |
 |---|---|---|
 | PF-001 | `code_verified` | 保持现有自动化证据；修正文档中旧的 `in_progress` 冲突 |
-| PF-002 | `code_verified / report_incomplete` | 扩写 Markdown 报告，补样本、失败案例、修复方法和回归对比 |
+| PF-002 | `delivered` | 报告扩写完成：样本、失败案例、修复方法、前后回归对比，由脚本生成可复现 |
 | PF-003 | `code_verified` | 保持修改效果与安全状态独立、风险确认和历史记录契约 |
-| PF-004 / GuidedDemo | `local_verified` | 补公开可访问和部署环境烟测证据 |
-| Agent 流程图 | `incomplete` | 补齐目标、状态、工具、分支、审核和停止条件，并从 README 链接 |
-| 产品案例说明 | `missing` | 形成独立案例，讲清问题、决策、边界、实现和结果 |
-| 三条简历描述 | `missing` | 基于真实实现和可复核测量结果撰写 |
-| README | `incomplete` | 更新 PF-001 至 PF-004、`/demo`、测试命令、图与报告链接、截图和隐私边界 |
-| 部署证据 | `blocked` | 验证公开 URL、环境回归和烟测；真实数据场景补迁移与索引证据 |
+| PF-004 / GuidedDemo | `local_verified` | 补公开可访问和部署环境烟测证据（公开部署仍待验证） |
+| Agent 六要素图 | `delivered` | `portfolio-agent-map.md` 呈现目标/状态/工具/分支/审核/停止条件，README 已链接 |
+| 产品案例说明 | `delivered` | `portfolio-case-study.md` 讲清问题、决策、边界、实现、结果 |
+| 三条简历描述 | `delivered` | `portfolio-resume-bullets.md` 基于真实实现和可复核测量结果 |
+| README | `delivered` | 更新 V0.1 定位、`/demo`、测试命令、交付材料链接、截图与隐私边界 |
+| Task 8 审计记录 | `delivered` | `responsive-workspace-audit-2026-08-08.md` 八项验收标准逐条证据 |
+| 部署证据 | `blocked` | dry-run 已完成；公开 URL 回归、人工烟测、正式迁移与索引验证仍待执行 |
 | PF-005 | `deferred / not_implemented` | 属于 V0.1 非阻塞项，正式清单中明确延期，不得声称已实现 |
 
 ### 9.3 当前可对外使用的结论
 
-可以对外说明：PF-001 至 PF-004 核心逻辑已实现并通过本地自动化基线；Apple 风格响应式重构正在进行。
+可以对外说明：PF-001 至 PF-004 核心逻辑已实现并通过本地自动化基线；Apple 风格响应式重构 Task 1 至 Task 8 全部完成并通过集成审计；V0.1 求职交付材料（评测报告、Agent 图、案例、简历描述、README）已收口。
 
-当前不能对外说明：V0.1 求职作品版已经完成、已经公开发布、已经通过真实数据迁移，或 PF-005 已实现。
+当前不能对外说明：V0.1 求职作品版已经公开发布、已经完成正式数据迁移，或 PF-005 已实现。真实 MongoDB 迁移仅完成 dry-run（0 冲突、15 孤立待回填），正式迁移与公开部署验证仍待执行。
+
+### 9.4 本轮开发遇到的问题与堵点
+
+#### 规格和代码质量问题
+
+- Task 1 首次实现把 press feedback 全局施加到所有 `button` 和 `[role=button]`，可能覆盖 Vant 和业务组件的 transform；已改回显式 `.pressable`。同时 `jsdom@30` 的 Node 要求高于仓库 Node 18/20 基线，已降为 `jsdom@26.1.0`。
+- Task 2 初次实现虽然单测通过，但存在默认 `kind` 错误、无返回按钮占位、硬分隔线、scoped `min-height:100%` 覆盖 `100svh`、间距和字号偏离计划等问题。说明仅靠正向挂载测试不能证明精确设计契约，必须逐项对照规格。
+- Task 3 修复了不完整 ARIA tabs、上传 label 双焦点、上传中点击/拖放并发、首页历史卡不可键盘导航等问题。上传入口现在由统一 `uploading` guard 串行化。
+- Task 4 修复了任务状态标签缺失、忽略服务端 `currentTaskId`、无推荐任务时无首项回退，以及 busy 期间并发选择/动作导致旧请求覆盖新状态的问题。
+- Task 5 发现并修复了重命名确认重复 PUT/埋点、保存失败仍关闭 dialog、legacy suggestions 重复渲染、轮询 timer 泄漏和路由切换旧响应回写、Radar 负分图形与 ARIA 摘要不一致。
+- Task 6 的初版把 `aria-live` 放在 keyed 节点上，步骤切换会销毁整个 live region；已改为稳定外层 live container，仅内部详情 keyed reveal。
+- Task 7 首次 E2E mock 使用 `**/api/**`，误拦截 `/src/api/index.js`，造成动态 import 失败；后改为只匹配根 `/api/*`。之后又修复了禁用控件被计入 tabbable、隐藏 tab 内容被误选、未知 API 被 `200 {}` 掩盖、焦点检查落在全页而非 Agent 工作区等测试假阳性。
+
+#### 当前实际堵点
+
+1. ~~**Task 5 至 Task 7 尚未提交。**~~ 已解决：本环境 Git 索引写入正常，Task 5/6/7 及 Task 8 修复已分提交（`eec3598`、`0e688d2`、`25766fc`、`467b55f`），worktree 干净。
+2. **Playwright 默认 webServer teardown 在当前 sandbox 挂起。** 所有断言完成后日志停在 `pw:webserver Terminating the WebServer`；最小复现和 Playwright Windows 源码确认其等待 `taskkill /T /F`，而受管 sandbox 阻止该子树终止。最终配置仍保留默认 `webServer` 和 `reuseExistingServer:false`；本地验证使用工具托管 Vite，并设置 `NO_WEBSERVER=1`，Playwright 可正常 exit 0。不要把该环境限制误判为页面或测试泄漏。
+3. ~~**Task 7 最终复审尚未完成。**~~ 已解决：Task 7 最终规格与代码质量复审通过并提交 `25766fc`。
+4. **主工作树两份 PF-002 报告已由增强脚本重生成。** 已验证差异仅为 `generatedAt` 时间戳（内容 42/42 稳定），扩写后的 Markdown 报告已作为交付材料提交；后续运行 `evaluate:pf002` 前仍需备份以保留历史版本。
+5. **真实数据库与公开部署仍未验证。** 所有权迁移 dry-run 已完成（0 冲突、15 孤立记录）；Supplement 唯一索引、公开 URL 回归和人工烟测仍是发布阻塞项，正式迁移需先确认数据库备份。
+
+### 9.5 响应式分支已提交记录
+
+响应式 worktree 分支 `feat/responsive-apple-workspace` 当前已提交 HEAD：`467b55f`。Task 5 至 Task 8 的全部改动均已按精确文件边界分提交，worktree 干净：
+
+| 提交 | 内容 |
+|---|---|
+| `7d4c6d8`（前序） | fix: restore Agent task selection safely |
+| `eec3598` | Task 5：feat: adapt result and history workspaces |
+| `0e688d2` | Task 6：feat: create responsive guided evidence demo |
+| `25766fc` | Task 7：test: verify responsive workspace in real browsers |
+| `467b55f` | Task 8 修复：fix: close responsive workspace review findings |
+
+Task 8 修复覆盖：SectionAnalysis 编辑入口改键盘可达按钮（Important）、DimensionCard/SectionAnalysis 补 `aria-controls`、ResumeInput 消除 `transition: all`、Supplement skip 自动启动加重入守卫（防重复会话）、AgentWorkbench `unavailable` 标签改中性色；配套新增回归测试（前端 38/38）。
+
+生成的 `web/e2e/screenshots/*.png`、`web/test-results/` 和 `web/playwright-report/` 已被忽略，不应提交。`git diff --check` 通过；Windows 会提示 LF 将转换为 CRLF，该提示不是 whitespace error，不要为消除提示而批量格式化既有文件。

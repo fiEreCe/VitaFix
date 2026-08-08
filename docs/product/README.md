@@ -71,6 +71,15 @@ updated_at: 2026-07-27
 | 单条修改工作台 | [editing-workbench.md](./modules/editing-workbench.md) | 追问、事实确认、生成建议、用户编辑和教学反馈 |
 | 简历组装与投递检查 | [resume-assembly-and-final-check.md](./modules/resume-assembly-and-final-check.md) | 组装岗位版本、检查真实性和完成投递方案 |
 
+## 4.5 求职作品交付材料
+
+| 材料 | 文档 | 用途 |
+|---|---|---|
+| Agent 六要素图 | [portfolio-agent-map.md](./portfolio-agent-map.md) | 目标、状态、工具、分支、审核、停止条件，供面试讲解 |
+| 产品案例说明 | [portfolio-case-study.md](./portfolio-case-study.md) | 问题、决策、边界、实现、结果 |
+| 三条简历描述 | [portfolio-resume-bullets.md](./portfolio-resume-bullets.md) | 基于真实实现与测量结果的简历表述 |
+| PF-002 评测报告 | [../server/evaluations/reports/pf002-report.md](../server/evaluations/reports/pf002-report.md) | 样本、失败案例、修复方式、前后回归对比 |
+
 ## 5. 唯一事实来源
 
 | 问题 | 权威文档 |
