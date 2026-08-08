@@ -22,6 +22,13 @@ test('demo fixture has a complete real validation record', () => {
   assert.ok(Object.isFrozen(record))
 })
 
+test('demo fixture keeps workflow business data inside session only', () => {
+  for (const key of ['requirements', 'resumeFacts', 'tasks']) {
+    assert.equal(Object.hasOwn(demoFixture, key), false)
+    assert.ok(Array.isArray(demoFixture.session[key]))
+  }
+})
+
 test('demo page is excluded from product page views', () => {
   assert.equal(shouldTrackPage('GuidedDemo'), false)
   assert.equal(shouldTrackPage('Home'), true)
