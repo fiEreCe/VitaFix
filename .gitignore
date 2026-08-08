@@ -10,6 +10,10 @@ yarn-error.log*
 
 # 构建产物
 web/dist/
+web/test-results/
+web/playwright-report/
+web/e2e/screenshots/*.png
+!web/e2e/screenshots/.gitkeep
 
 # IDE
 .vscode/
