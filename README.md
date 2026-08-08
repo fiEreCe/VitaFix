@@ -153,12 +153,27 @@ npm.cmd run build
 
 ---
 
-## 部署状态
+## 部署
+
+### 架构
+
+- **前端 → Vercel**：Vite 静态托管（根目录 `vercel.json` 已配置构建与路由）。
+- **后端 → Railway**：Express API 保持在线；Vercel 将 `/api/*` 反向代理到 `https://vitafix-production.up.railway.app/api/*`（浏览器同源，无需 CORS 处理）。
+- 前端使用相对路径 `/api`，无需前端环境变量。
+
+### Vercel 接入（首次）
+
+1. 将本仓库连接到 GitHub（`main` 分支已推送，含 `vercel.json`）。
+2. 在 Vercel Dashboard → **Add New Project → Import** `fiEreCe/VitaFix`。
+3. Vercel 自动读取根目录 `vercel.json`（`framework: vite`、`installCommand`、`buildCommand`、`outputDirectory`、`rewrites`），无需额外配置。
+4. 点击 **Deploy**。生产域名即可访问；`/api/*` 自动代理到 Railway。
+
+### 部署状态
 
 - **本地代码与自动化基线**：已完成（见上文质量基线）。
 - **真实数据迁移**：已完成。所有权迁移（dry-run + 正式）在确认备份后执行：0 冲突、15 条历史孤立记录按设计保留；Supplement 部分唯一索引已在真实 MongoDB 验证存在。
-- **公开部署验证**：进行中。公开 URL 回归与人工烟测完成后，才视为 V0.1 正式发布；**在验证完成前不宣称已发布**。
-- 生产环境需配置 `MONGODB_URI`、`DEEPSEEK_API_KEY`、`NODE_ENV=production`。
+- **公开部署验证**：进行中。Vercel 部署 + 公开 URL 回归与人工烟测完成后，才视为 V0.1 正式发布；**在验证完成前不宣称已发布**。
+- 后端生产环境需配置 `MONGODB_URI`、`DEEPSEEK_API_KEY`、`NODE_ENV=production`（Railway 侧已配置）。
 
 ---
 
