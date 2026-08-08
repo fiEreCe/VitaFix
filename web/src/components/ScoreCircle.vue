@@ -22,7 +22,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   score: { type: Number, default: 0 },
@@ -30,8 +30,37 @@ const props = defineProps({
 })
 
 const circumference = 2 * Math.PI * 52
+const revealedScore = ref(0)
+let revealFrame = null
+
+function prefersReducedMotion() {
+  return typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function revealScore(score) {
+  if (revealFrame !== null) cancelAnimationFrame(revealFrame)
+  if (prefersReducedMotion()) {
+    revealedScore.value = score
+    return
+  }
+  revealedScore.value = 0
+  revealFrame = requestAnimationFrame(() => {
+    revealedScore.value = score
+    revealFrame = null
+  })
+}
+
+onMounted(() => revealScore(props.score))
+watch(() => props.score, revealScore)
+onBeforeUnmount(() => {
+  if (revealFrame !== null) cancelAnimationFrame(revealFrame)
+})
+
 const dashOffset = computed(() => {
-  return circumference - (circumference * Math.min(props.score, 100)) / 100
+  const score = Math.min(Math.max(revealedScore.value, 0), 100)
+  return circumference - (circumference * score) / 100
 })
 </script>
 
@@ -51,7 +80,7 @@ const dashOffset = computed(() => {
 }
 
 .circle-progress {
-  transition: stroke-dashoffset 1s ease-in-out;
+  transition: stroke-dashoffset 300ms var(--ease-out-fluid);
 }
 
 .score-text {
@@ -70,5 +99,11 @@ const dashOffset = computed(() => {
   font-size: 12px;
   color: var(--text-secondary);
   margin-left: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .circle-progress {
+    transition: none;
+  }
 }
 </style>

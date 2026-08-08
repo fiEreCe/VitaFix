@@ -1,6 +1,6 @@
 <template>
-  <div class="radar-chart">
-    <svg :viewBox="`0 0 ${size} ${size}`" class="radar-svg">
+  <div class="radar-chart" role="img" :aria-label="scoreSummary">
+    <svg :viewBox="`0 0 ${size} ${size}`" class="radar-svg" aria-hidden="true">
       <!-- 网格 -->
       <polygon
         v-for="level in levels"
@@ -69,6 +69,16 @@ const cx = computed(() => props.size / 2)
 const cy = computed(() => props.size / 2)
 const radius = computed(() => props.size * 0.35)
 const levels = [0.25, 0.5, 0.75, 1]
+function clampScore(score) {
+  return Math.min(Math.max(Number(score) || 0, 0), 100)
+}
+
+const scoreSummary = computed(() => {
+  if (!props.dimensions.length) return '暂无维度评分'
+  return props.dimensions
+    .map((dimension) => `${dimension.name} ${clampScore(dimension.score)} 分`)
+    .join('，')
+})
 
 function angle(index) {
   const n = props.dimensions.length
@@ -94,7 +104,7 @@ function gridPoints(level) {
 
 const dataPointArray = computed(() => {
   return props.dimensions.map((dim, idx) => {
-    const ratio = Math.min(dim.score || 0, 100) / 100
+    const ratio = clampScore(dim.score) / 100
     return point(idx, ratio)
   })
 })

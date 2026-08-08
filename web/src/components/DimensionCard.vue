@@ -1,22 +1,31 @@
 <template>
-  <div class="dimension-card" :class="{ expanded }" @click="expanded = !expanded">
-    <div class="dimension-header">
+  <div class="dimension-card" :class="{ expanded }">
+    <button
+      class="dimension-header"
+      type="button"
+      :aria-expanded="expanded"
+      :aria-controls="detailId"
+      @click="expanded = !expanded"
+    >
       <span class="dimension-name">{{ dimension.name }}</span>
       <span class="dimension-score" :style="{ color: scoreColor }">{{ dimension.score }}</span>
       <svg :class="['arrow-icon', { rotated: expanded }]" width="12" height="12" viewBox="0 0 12 12" fill="none">
         <path d="M3 5l3 3 3-3" stroke="#aeaeb2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-    </div>
+    </button>
 
     <div class="score-bar">
       <div class="score-bar-bg">
-        <div class="score-bar-fill" :style="{ width: (dimension.score || 0) + '%', background: scoreColor }" />
+        <div
+          class="score-bar-fill"
+          :style="{ transform: `scaleX(${normalizedScore})`, background: scoreColor }"
+        />
       </div>
     </div>
 
     <div v-if="dimension.detail" class="dimension-detail">{{ dimension.detail }}</div>
 
-    <template v-if="expanded">
+    <div v-if="expanded" :id="detailId">
       <div v-if="dimension.matchedItems?.length" class="dimension-list">
         <div class="list-label">匹配项</div>
         <div v-for="(item, idx) in dimension.matchedItems" :key="idx" class="list-item">
@@ -32,7 +41,7 @@
           <div class="list-item-desc">{{ item.suggestion }}</div>
         </div>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -48,6 +57,10 @@ const props = defineProps({
 
 const expanded = ref(false)
 const scoreColor = computed(() => getGradeColor(props.dimension.score || 0))
+const normalizedScore = computed(() => Math.min(Math.max(props.dimension.score || 0, 0), 100) / 100)
+const detailId = computed(() =>
+  'dimension-detail-' + String(props.dimension.name || '').replace(/\s+/g, '-')
+)
 </script>
 
 <style scoped>
@@ -55,7 +68,6 @@ const scoreColor = computed(() => getGradeColor(props.dimension.score || 0))
   background: var(--bg-card);
   border-radius: var(--radius-md);
   padding: 16px;
-  cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: box-shadow 0.2s;
 }
@@ -68,6 +80,13 @@ const scoreColor = computed(() => getGradeColor(props.dimension.score || 0))
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .dimension-name {
@@ -108,7 +127,8 @@ const scoreColor = computed(() => getGradeColor(props.dimension.score || 0))
 .score-bar-fill {
   height: 100%;
   border-radius: 2px;
-  transition: width 1s ease-in-out;
+  transform-origin: left center;
+  transition: transform 300ms var(--ease-out-fluid);
 }
 
 .dimension-detail {

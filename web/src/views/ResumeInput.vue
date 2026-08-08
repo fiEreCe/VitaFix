@@ -1,30 +1,43 @@
 <template>
-  <div class="resume-input">
-    <van-nav-bar
-      title="输入简历"
-      left-arrow
-      @click-left="$router.back()"
-    />
-
-    <div class="content">
+  <AppPage title="输入简历" description="选择粘贴文本或上传原始文件" back @back="$router.back()">
+    <div class="content reading-column">
       <!-- 输入方式切换 -->
-      <div class="method-tabs">
-        <div
-          :class="['method-tab', { active: method === 'paste' }]"
+      <div class="method-tabs" role="tablist" aria-label="输入方式">
+        <button
+          id="resume-method-tab-0"
+          type="button"
+          role="tab"
+          :class="['method-tab', 'pressable', { active: method === 'paste' }]"
+          :aria-selected="method === 'paste'"
+          aria-controls="resume-method-panel-0"
+          :tabindex="method === 'paste' ? 0 : -1"
           @click="method = 'paste'"
+          @keydown="handleMethodKeydown"
         >
-          <van-icon name="edit" /> 粘贴文本
-        </div>
-        <div
-          :class="['method-tab', { active: method === 'upload' }]"
+          <van-icon name="edit" aria-hidden="true" /> 粘贴文本
+        </button>
+        <button
+          id="resume-method-tab-1"
+          type="button"
+          role="tab"
+          :class="['method-tab', 'pressable', { active: method === 'upload' }]"
+          :aria-selected="method === 'upload'"
+          aria-controls="resume-method-panel-1"
+          :tabindex="method === 'upload' ? 0 : -1"
           @click="method = 'upload'"
+          @keydown="handleMethodKeydown"
         >
-          <van-icon name="uploader" /> 上传文件
-        </div>
+          <van-icon name="uploader" aria-hidden="true" /> 上传文件
+        </button>
       </div>
 
       <!-- ============= 方式一：粘贴文本 ============= -->
-      <div v-if="method === 'paste'">
+      <div
+        v-if="method === 'paste'"
+        id="resume-method-panel-0"
+        role="tabpanel"
+        aria-labelledby="resume-method-tab-0"
+      >
         <div class="tip-card">
           <van-icon name="info-o" />
           <span>从简历文件（PDF/Word）中复制全文，粘贴到下方。AI会自动识别各个板块。</span>
@@ -42,26 +55,36 @@
       </div>
 
       <!-- ============= 方式二：上传文件 ============= -->
-      <div v-else class="upload-method">
+      <div
+        v-else
+        id="resume-method-panel-1"
+        class="upload-method"
+        role="tabpanel"
+        aria-labelledby="resume-method-tab-1"
+      >
         <div class="tip-card">
           <van-icon name="info-o" />
           <span>支持 PDF、DOCX、TXT 格式，文件最大 20MB</span>
         </div>
 
         <!-- 拖拽上传区 -->
-        <div
+        <label
+          for="resume-file"
           class="drop-zone"
-          :class="{ dragover: isDragover, 'has-file': uploadedFile }"
+          :class="{ dragover: isDragover, 'has-file': uploadedFile, 'is-uploading': uploading }"
+          :aria-busy="uploading"
           @dragover.prevent="isDragover = true"
           @dragleave.prevent="isDragover = false"
           @drop.prevent="handleDrop"
-          @click="triggerFileInput"
         >
           <input
-            ref="fileInput"
+            id="resume-file"
+            class="file-input"
             type="file"
             accept=".pdf,.docx,.doc,.txt"
-            style="display:none"
+            aria-label="上传简历文件"
+            :aria-busy="uploading"
+            :disabled="uploading"
             @change="handleFileSelect"
           />
 
@@ -83,7 +106,7 @@
             <p class="drop-text">点击上传文件，或将文件拖拽到此处</p>
             <p class="drop-hint">支持 PDF / DOCX / TXT</p>
           </template>
-        </div>
+        </label>
       </div>
 
       <!-- ============= 解析结果展示 ============= -->
@@ -163,7 +186,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </AppPage>
 </template>
 
 <script setup>
@@ -171,6 +194,7 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { resumeApi } from '../api'
+import AppPage from '../components/ui/AppPage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -182,10 +206,26 @@ const parsedResult = ref(null)
 const currentResumeId = ref('')
 
 // 文件上传状态
-const fileInput = ref(null)
 const uploadedFile = ref(null)
 const isDragover = ref(false)
 const uploading = ref(false)
+
+const inputMethods = ['paste', 'upload']
+
+function handleMethodKeydown(event) {
+  const currentIndex = inputMethods.indexOf(method.value)
+  let nextIndex
+
+  if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % inputMethods.length
+  else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + inputMethods.length) % inputMethods.length
+  else if (event.key === 'Home') nextIndex = 0
+  else if (event.key === 'End') nextIndex = inputMethods.length - 1
+  else return
+
+  event.preventDefault()
+  method.value = inputMethods[nextIndex]
+  document.getElementById(`resume-method-tab-${nextIndex}`)?.focus()
+}
 
 const jdId = computed(() => route.query.jdId || '')
 
@@ -202,12 +242,10 @@ function handleFileSelect(e) {
   if (file) uploadFile(file)
 }
 
-function triggerFileInput() {
-  if (!uploading.value) fileInput.value?.click()
-}
-
 /** 上传并解析文件 */
 async function uploadFile(file) {
+  if (uploading.value) return
+
   const ext = '.' + file.name.split('.').pop().toLowerCase()
   const allowed = ['.pdf', '.docx', '.doc', '.txt']
   if (!allowed.includes(ext)) {
@@ -284,15 +322,8 @@ function formatFileSize(bytes) {
 
 <style scoped>
 /* ============ 基础布局 ============ */
-.resume-input {
-  min-height: 100vh;
-  background: var(--bg-page);
-}
-
 .content {
-  padding: 16px;
-  max-width: 800px;
-  margin: 0 auto;
+  min-width: 0;
 }
 
 /* ============ 方式切换标签 ============ */
@@ -305,14 +336,15 @@ function formatFileSize(bytes) {
 .method-tab {
   flex: 1;
   text-align: center;
-  padding: 10px;
+  min-height: 2.75rem;
+  padding: 0.625rem;
   background: var(--bg-card);
   border-radius: var(--radius-md);
   font-size: 14px;
   color: var(--text-secondary);
   cursor: pointer;
   border: 1px solid transparent;
-  transition: all 0.2s;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
 }
 
 .method-tab.active {
@@ -343,13 +375,39 @@ function formatFileSize(bytes) {
 
 /* ============ 拖拽上传区 ============ */
 .drop-zone {
+  display: block;
+  position: relative;
   border: 2px dashed #ddd;
   border-radius: var(--radius-lg);
   padding: 48px 24px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.2s, background-color 0.2s;
   background: var(--bg-card);
+}
+
+.file-input {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.drop-zone:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.drop-zone.is-uploading {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.file-input:disabled {
+  cursor: progress;
 }
 
 .drop-zone:hover {
@@ -459,9 +517,9 @@ function formatFileSize(bytes) {
 }
 
 /* ============ PC 响应式 ============ */
-@media (min-width: 768px) {
+@media (min-width: 56.25rem) {
   .content {
-    padding: 32px 24px;
+    padding-block: var(--spacing-lg);
   }
 
   .drop-zone {

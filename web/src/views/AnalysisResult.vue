@@ -1,28 +1,34 @@
 <template>
-  <div class="analysis-result">
-    <van-nav-bar
-      :title="analysisName"
-      left-arrow
-      @click-left="$router.back()"
-    />
+  <AppPage
+    class="analysis-result"
+    :title="analysisName"
+    eyebrow="岗位匹配分析"
+    back
+    @back="router.back()"
+  >
 
     <!-- 加载中 -->
-    <div v-if="loading" class="loading-state">
-      <van-loading size="40" type="spinner">AI正在分析你的简历...</van-loading>
-      <p class="loading-tip">正在与JD要求进行逐项比对，请稍候</p>
-    </div>
+    <StatusPanel
+      v-if="loading"
+      kind="loading"
+      title="AI 正在分析你的简历"
+      message="正在与 JD 要求进行逐项比对，请稍候。"
+    />
 
     <!-- 分析失败 -->
-    <div v-else-if="failed" class="error-state">
-      <van-empty description="分析失败" />
-      <p class="error-msg">{{ errorMessage }}</p>
-      <van-button round @click="retry">重试</van-button>
-    </div>
+    <StatusPanel
+      v-else-if="failed"
+      kind="error"
+      title="分析失败"
+      :message="errorMessage"
+      retryable
+      @retry="retry"
+    />
 
     <!-- 分析结果 -->
-    <div v-else-if="result" class="result-content">
+    <div v-else-if="result" class="result-layout">
       <!-- 顶部：整体评分（始终显示） -->
-      <div class="score-section">
+      <div class="score-section result-overview" aria-label="分析概览">
         <div class="score-area">
           <ScoreCircle :score="result.overallScore" :color="gradeColor" />
           <div class="score-info">
@@ -33,7 +39,7 @@
       </div>
 
       <!-- Tab 切换 -->
-      <van-tabs v-model="activeTab" class="result-tabs" sticky>
+      <van-tabs v-model="activeTab" class="result-tabs" aria-label="分析详情" sticky>
         <!-- Tab 1: 维度分析 -->
         <van-tab title="维度分析">
           <div class="tab-content">
@@ -118,11 +124,11 @@
         </van-button>
       </div>
     </div>
-  </div>
+  </AppPage>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { analysisApi } from '../api'
@@ -133,6 +139,8 @@ import RadarChart from '../components/RadarChart.vue'
 import DimensionCard from '../components/DimensionCard.vue'
 import RequirementItem from '../components/RequirementItem.vue'
 import SectionAnalysis from '../components/SectionAnalysis.vue'
+import AppPage from '../components/ui/AppPage.vue'
+import StatusPanel from '../components/ui/StatusPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -146,6 +154,8 @@ const activeTab = ref(0)
 
 // 轮询状态
 let pollTimer = null
+let pollGeneration = 0
+let statusInFlightToken = null
 
 onMounted(() => {
   const id = route.params.id
@@ -157,59 +167,88 @@ onMounted(() => {
   }
 })
 
-// 清理定时器
-watch(() => route.params.id, () => {
-  if (pollTimer) clearInterval(pollTimer)
+watch(() => route.params.id, (id) => {
+  if (id) {
+    pollResult(id)
+  } else {
+    invalidatePolling()
+  }
 })
 
+onBeforeUnmount(() => {
+  invalidatePolling()
+})
+
+function clearPolling() {
+  if (pollTimer) clearInterval(pollTimer)
+  pollTimer = null
+}
+
+function invalidatePolling() {
+  clearPolling()
+  pollGeneration += 1
+  statusInFlightToken = null
+  return pollGeneration
+}
+
+function isCurrentPoll(id, token) {
+  return token === pollGeneration && route.params.id === id
+}
+
 async function pollResult(id) {
+  const token = invalidatePolling()
   loading.value = true
   failed.value = false
 
-  // 先查询状态
-  try {
-    const statusRes = await analysisApi.getStatus(id)
-    if (statusRes.status === 'completed') {
-      await loadResult(id)
-      return
-    }
-    if (statusRes.status === 'failed') {
-      failed.value = true
-      errorMessage.value = statusRes.errorMessage || '分析过程出错'
-      loading.value = false
-      return
-    }
-  } catch (e) {
-    // 可能第一次请求还没创建完成，继续轮询
-  }
+  const terminal = await checkStatus(id, token)
+  if (terminal || !isCurrentPoll(id, token)) return
 
   // 轮询等待
-  pollTimer = setInterval(async () => {
-    try {
-      const statusRes = await analysisApi.getStatus(id)
-      if (statusRes.status === 'completed') {
-        clearInterval(pollTimer)
-        await loadResult(id)
-      } else if (statusRes.status === 'failed') {
-        clearInterval(pollTimer)
-        failed.value = true
-        errorMessage.value = statusRes.errorMessage || '分析过程出错'
-        loading.value = false
-      }
-    } catch (e) {
-      // 继续轮询
-    }
+  pollTimer = setInterval(() => {
+    void checkStatus(id, token)
   }, 2000)
 }
 
-async function loadResult(id) {
+async function checkStatus(id, token) {
+  if (!isCurrentPoll(id, token) || statusInFlightToken === token) return false
+  statusInFlightToken = token
+
+  try {
+    const statusRes = await analysisApi.getStatus(id)
+    if (!isCurrentPoll(id, token)) return true
+
+    if (statusRes.status === 'completed') {
+      clearPolling()
+      await loadResult(id, token)
+      return true
+    }
+    if (statusRes.status === 'failed') {
+      clearPolling()
+      failed.value = true
+      errorMessage.value = statusRes.errorMessage || '分析过程出错'
+      loading.value = false
+      return true
+    }
+  } catch (e) {
+    // 请求暂时失败时保持既有行为，继续轮询
+    return false
+  } finally {
+    if (statusInFlightToken === token) statusInFlightToken = null
+  }
+
+  return false
+}
+
+async function loadResult(id, token) {
   try {
     const res = await analysisApi.getById(id)
+    if (!isCurrentPoll(id, token)) return
     result.value = res.analysis
     analysisName.value = res.name || '分析结果'
     loading.value = false
     events.analysisCompleted()
   } catch (e) {
+    if (!isCurrentPoll(id, token)) return
     failed.value = true
     errorMessage.value = e.message
     loading.value = false
@@ -260,6 +299,13 @@ const unmatchedCount = computed(() =>
   background: var(--bg-page);
 }
 
+.result-layout {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, var(--workspace-max));
+  margin: 0 auto;
+}
+
 .loading-state,
 .error-state {
   display: flex;
@@ -285,7 +331,7 @@ const unmatchedCount = computed(() =>
 /* Apple score card */
 .score-section {
   background: var(--bg-card);
-  margin: 16px;
+  margin: 16px 16px 0;
   padding: 24px;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
@@ -357,6 +403,31 @@ const unmatchedCount = computed(() =>
 .bottom-actions .van-button--default {
   border: 1px solid #d2d2d7;
   color: var(--text-primary);
+}
+
+@media (min-width: 56.25rem) {
+  .result-layout {
+    grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+    align-items: start;
+    padding: 1rem 2rem 2rem;
+  }
+
+  .result-overview {
+    position: sticky;
+    top: 6.5rem;
+    margin: 0;
+  }
+
+  .result-tabs,
+  .bottom-actions {
+    grid-column: 2;
+    margin: 0;
+  }
+
+  .bottom-actions {
+    padding-right: 0;
+    padding-left: 0;
+  }
 }
 
 .radar-section {
