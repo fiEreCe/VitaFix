@@ -51,7 +51,8 @@ related_docs:
 | Apple 响应式重构 | `completed` | Task 1 至 Task 8 全部完成并提交；Task 8 集成审计通过 |
 | 求职交付材料 | `completed` | PF-002 报告、Agent 图、案例、简历描述、README、审计记录均已收口 |
 | 真实数据迁移 | `completed` | dry-run + 正式迁移完成（0 冲突、15 孤立保留）；Supplement 部分唯一索引已验证 |
-| 发布就绪 | `blocked` | 迁移与索引已验证；仅剩公开环境回归与人工烟测 |
+| Vercel 部署 | `in_progress` | 前端已部署（vita-fix.vercel.app），后端留 Railway；响应式分支已合并进 main；上传 500 未解决 + 公开烟测未完成 |
+| 发布就绪 | `blocked` | Vercel 已部署但上传 500 阻塞；公开环境回归与人工烟测待完成 |
 
 文档头部继续保留 `status: in_progress`，表示发布交接尚未结束，不表示 PF-001 至 PF-004 的代码仍未完成。
 
@@ -440,9 +441,9 @@ npm.cmd run build
 
 ### 9.3 当前可对外使用的结论
 
-可以对外说明：PF-001 至 PF-004 核心逻辑已实现并通过本地自动化基线；Apple 风格响应式重构 Task 1 至 Task 8 全部完成并通过集成审计；V0.1 求职交付材料（评测报告、Agent 图、案例、简历描述、README）已收口。
+可以对外说明：PF-001 至 PF-004 核心逻辑已实现并通过本地自动化基线；Apple 风格响应式重构 Task 1 至 Task 8 全部完成并通过集成审计；V0.1 求职交付材料已收口；前端已部署到 Vercel（vita-fix.vercel.app），后端保持 Railway。
 
-当前不能对外说明：V0.1 求职作品版已经公开发布，或 PF-005 已实现。真实 MongoDB 所有权迁移与 Supplement 索引验证已完成；公开部署回归与人工烟测仍待执行。
+当前不能对外说明：V0.1 求职作品版已经正式发布（上传 500 未解决、公开烟测未完成），或 PF-005 已实现。真实 MongoDB 所有权迁移与 Supplement 索引验证已完成；公开 URL 回归、人工烟测与上传修复仍待完成。
 
 ### 9.4 本轮开发遇到的问题与堵点
 
@@ -479,3 +480,41 @@ npm.cmd run build
 Task 8 修复覆盖：SectionAnalysis 编辑入口改键盘可达按钮（Important）、DimensionCard/SectionAnalysis 补 `aria-controls`、ResumeInput 消除 `transition: all`、Supplement skip 自动启动加重入守卫（防重复会话）、AgentWorkbench `unavailable` 标签改中性色；配套新增回归测试（前端 38/38）。
 
 生成的 `web/e2e/screenshots/*.png`、`web/test-results/` 和 `web/playwright-report/` 已被忽略，不应提交。`git diff --check` 通过；Windows 会提示 LF 将转换为 CRLF，该提示不是 whitespace error，不要为消除提示而批量格式化既有文件。
+
+## 10. 2026-08-08 Vercel 部署进度
+
+### 10.1 架构与部署
+
+- **架构**：前端静态托管到 Vercel（项目 `vita-fix`，生产地址 `https://vita-fix.vercel.app`），后端保持 Railway（`https://vitafix-production.up.railway.app`）。Vercel 的 `vercel.json` 将 `/api/*` 通过外部 rewrite 反向代理到 Railway；前端使用相对路径 `/api`，浏览器同源、无 CORS。
+- **响应式分支合并**：`feat/responsive-apple-workspace` 已合并进 main（`28ca000`），main 现包含 V0.1 响应式前端全部代码。
+- **vercel.json**（`4158324`）：`framework: vite`、`installCommand: cd web && npm install`、`buildCommand: cd web && npm run build`、`outputDirectory: web/dist`、rewrites（`/api/(.*)` → Railway + `/:path*` → `/index.html`）。
+- **Git 集成已确认**：推送 main 会自动触发 Vercel 生产部署（`879d5cc` 触发部署 `vita-loeohf2s5-fi-er-ece`，Ready，含 `λ api/jd/ocr` 与 `λ api/resume/upload` 两个函数）。
+- Vercel CLI 在本地已登录（`fierece`），可用于 `vercel ls/inspect/logs` 排障。
+
+### 10.2 已验证
+
+- 生产部署状态 Ready；三个别名（`vita-fix.vercel.app` 等）指向最新生产部署。
+- 经 Vercel 代理的 `GET /api/health` 与 `GET /api/analysis`（带/不带 `X-User-Id` 行为符合预期）可达 Railway，说明 JSON/GET 代理链路正常。
+- 直连 Railway 的 resume 上传（含 chunked multipart）返回 201，后端文件解析正常。
+
+### 10.3 当前堵点：上传 500 未解决
+
+- **现象**：经 Vercel 代理的 `POST /api/resume/upload` 返回 500（响应带 `X-Railway-Edge`，说明请求已到达 Railway）；**直连 Railway 上传正常**（201）。
+- **已定位根因**：Vercel 外部 rewrite 不可靠转发 multipart/form-data 的请求体，导致 Railway 侧 multer 解析失败。
+- **已尝试修复**（`879d5cc`）：为 `/api/resume/upload` 与 `/api/jd/ocr` 增加薄 Serverless 代理函数（`api/resume/upload.js`、`api/jd/ocr.js`，流式转发 body + `duplex:'half'`）；本地已验证 chunked multipart 直连 Railway 201。
+- **修复未生效**：用户实测上传仍 failed。**待确认原因**（按可能性排序）：
+  1. Vercel 路由优先级——外部 rewrite `/api/(.*)` 是否在 Serverless 函数之前命中，导致函数从未被调用；
+  2. 代理函数自身在 Vercel 运行时抛错（需 `vercel logs <deployment>` 查函数日志）；
+  3. 浏览器/别名缓存导致旧路由仍生效（应硬刷新验证）。
+- **下一步**：查新部署运行时日志确认函数是否命中；若函数被外部 rewrite 遮蔽，改为函数优先路由（将 `/api/(.*)` rewrite 改为纯兜底，或整段 `/api` 走函数并评估 `start` 超时），或改用 Vercel Middleware/Edge 代理。
+
+### 10.4 以后注意事项
+
+- **Vercel 外部 rewrite 不转发 multipart body**：任何上传类接口必须走 Serverless 函数或 Edge 代理，不能依赖外部 rewrite。
+- **函数 vs rewrite 路由优先级需实测**：`api/` 函数与外部 rewrite 并存时，必须用 `vercel logs` 确认函数确实被命中（当前上传修复未生效的怀疑点）。
+- **`start` 长调用**：`POST /agent-sessions/:id/start` 会阻塞完成 AI 解析（可达 10-30 秒），不能放进默认 10s 超时的 Serverless 函数；边缘 rewrite 无此限制。若未来整段 `/api` 走函数，必须为 `start` 等长调用设置 `maxDuration` 并确认套餐上限。
+- **沙箱无法访问 `*.vercel.app`**：本环境 DNS 被屏蔽（解析到异常 IP），公开 URL 烟测必须由用户浏览器完成，不能断言"已公开可用"。
+- **Railway 后端无效 ObjectId → 500**：输入校验小缺口（`session-abc` 之类返回 500 而非 400/404），真实 ID 不触发；修复需重部署 Railway。
+- **别名/缓存**：改前端或路由后需硬刷新（Ctrl+F5）验证，避免误判旧路由。
+- **设备 ID 隔离**：若改用函数代理全量 `/api`，必须确认 `X-User-Id` 请求头被显式转发，否则用户隔离接口会 400。
+- **两套前端并存**：Railway 根地址仍服务旧前端，Vercel 才是 V0.1 正式入口；对外只宣传 Vercel 地址。
