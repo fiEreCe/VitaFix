@@ -69,6 +69,64 @@ test('runs a recommended task through fact confirmation and a verified candidate
   const result = await app.generateCandidate(created.id, 'u1', ready.tasks[0].id);
   assert.equal(result.tasks[0].state, 'awaiting_user_decision');
   assert.equal(result.tasks[0].candidate.verification.status, 'passed');
+
+  const accepted = await app.decide(created.id, 'u1', ready.tasks[0].id, { type: 'accepted' });
+  assert.equal(accepted.tasks[0].state, 'accepted');
+  assert.equal(accepted.tasks[0].currentText, '参与校园交易用户问卷设计');
+  assert.equal(accepted.handoff.finalText, '参与校园交易用户问卷设计');
+  assert.equal(accepted.handoff.verificationStatus, 'passed');
+  assert.deepEqual(accepted.handoff.factRefs, ['fact-1']);
+});
+
+test('a warning audit is retained for the user and can still be adopted', async () => {
+  const store = new Map();
+  const repository = {
+    async create(value) { store.set(value.id, structuredClone(value)); return store.get(value.id); },
+    async get(id) { return store.get(id); },
+    async save(value) { store.set(value.id, structuredClone(value)); return store.get(value.id); },
+  };
+  const app = new AgentOrchestrator({
+    repository,
+    tools: {
+      draftRevision: async () => ({ text: '参与约20位用户访谈', factRefs: ['f1'] }),
+      verifyRevision: async () => ({
+        status: 'warning',
+        findings: [{ type: 'estimated_number' }],
+        supportedClaims: ['参与约20位用户访谈'],
+        unsupportedClaims: [],
+        factRefs: ['f1'],
+      }),
+    },
+  });
+  const session = await app.createSession({ userId: 'u1', jdText: 'JD', resumeText: 'resume' });
+  session.requirements = [{ id: 'r1', sourceText: '用户研究' }];
+  session.resumeFacts = [{
+    id: 'f1',
+    sourceText: '参与用户访谈',
+    action: '参与用户访谈',
+    context: '校园产品',
+    contribution: '团队共同完成',
+    quantity: '20',
+    quantityType: 'estimated',
+    confirmation: 'confirmed',
+  }];
+  session.tasks = [{
+    id: 'task-1',
+    requirementId: 'r1',
+    factIds: ['f1'],
+    state: 'generating',
+    effectiveRounds: 0,
+  }];
+
+  const generated = await app.generateCandidate(session.id, 'u1', 'task-1');
+  assert.equal(generated.tasks[0].state, 'awaiting_user_decision');
+  assert.equal(generated.tasks[0].candidate.verification.status, 'warning');
+  assert.ok(generated.tasks[0].candidate.verification.findings
+    .some((item) => item.type === 'estimated_number'));
+
+  const accepted = await app.decide(session.id, 'u1', 'task-1', { type: 'accepted' });
+  assert.equal(accepted.tasks[0].state, 'accepted');
+  assert.equal(accepted.handoff.verificationStatus, 'warning');
 });
 
 test('answer creates a pending fact which requires confirmation', async () => {
@@ -299,6 +357,87 @@ test('semantic audit retry preserves the generated candidate and only reruns aud
   assert.equal(draftCalls, 1);
   assert.equal(auditCalls, 2);
   assert.deepEqual(retried.tasks[0].factIds, ['f1']);
+  assert.equal(retried.tasks[0].candidate.text, '参与用户访谈并整理反馈');
+  assert.deepEqual(retried.tasks[0].candidate.factRefs, ['f1']);
+
+  const accepted = await app.decide(session.id, 'u1', 'task-1', { type: 'accepted' });
+  assert.equal(accepted.tasks[0].state, 'accepted');
+  assert.equal(accepted.tasks[0].currentText, '参与用户访谈并整理反馈');
+  assert.equal(accepted.handoff.verificationStatus, 'passed');
+  assert.deepEqual(accepted.handoff.factRefs, ['f1']);
+});
+
+test('truncated semantic audit fails the task and retry reuses the same candidate', async () => {
+  const { AgentAuditService } = require('../services/agent/agentAuditService');
+  const store = new Map();
+  let draftCalls = 0;
+  let truncated = true;
+  const repository = {
+    async create(value) { store.set(value.id, structuredClone(value)); return store.get(value.id); },
+    async get(id) { return store.get(id); },
+    async save(value) { store.set(value.id, structuredClone(value)); return store.get(value.id); },
+  };
+  const audit = new AgentAuditService({
+    judge: async () => {
+      if (truncated) {
+        const error = new Error('DeepSeek API 请求失败: AI 返回内容被截断');
+        error.code = 'AI_RESPONSE_TRUNCATED';
+        error.finishReason = 'length';
+        throw error;
+      }
+      return {
+        status: 'passed',
+        findings: [],
+        supportedClaims: ['参与用户访谈并整理反馈'],
+        unsupportedClaims: [],
+        factRefs: ['f1'],
+      };
+    },
+  });
+  const app = new AgentOrchestrator({
+    repository,
+    tools: {
+      draftRevision: async () => {
+        draftCalls += 1;
+        return { text: '参与用户访谈并整理反馈', factRefs: ['f1'] };
+      },
+      verifyRevision: (input) => audit.verifyRevision(input),
+    },
+  });
+  const session = await app.createSession({ userId: 'u1', jdText: 'JD', resumeText: 'resume' });
+  session.requirements = [{ id: 'r1', sourceText: '用户研究' }];
+  session.resumeFacts = [{
+    id: 'f1',
+    sourceText: '参与用户访谈并整理反馈',
+    action: '参与用户访谈',
+    context: '校园产品',
+    contribution: '团队共同完成',
+    confirmation: 'confirmed',
+  }];
+  session.tasks = [{
+    id: 'task-1',
+    requirementId: 'r1',
+    factIds: ['f1'],
+    state: 'generating',
+    effectiveRounds: 0,
+  }];
+
+  const failed = await app.generateCandidate(session.id, 'u1', 'task-1');
+  assert.equal(failed.tasks[0].state, 'verification_failed');
+  assert.equal(failed.tasks[0].candidate.verification.status, 'unavailable');
+  const finding = failed.tasks[0].candidate.verification.findings
+    .find((item) => item.type === 'semantic_audit_unavailable');
+  assert.equal(finding.code, 'AI_RESPONSE_TRUNCATED');
+  assert.equal(finding.finishReason, 'length');
+  assert.equal(draftCalls, 1);
+
+  truncated = false;
+  const retried = await app.retryCurrentStep(session.id, 'u1', 'task-1');
+  assert.equal(retried.tasks[0].state, 'awaiting_user_decision');
+  assert.equal(draftCalls, 1);
+  assert.equal(retried.tasks[0].candidate.text, '参与用户访谈并整理反馈');
+  assert.deepEqual(retried.tasks[0].candidate.factRefs, ['f1']);
+  assert.deepEqual(retried.tasks[0].factIds, ['f1']);
 });
 
 test('never adopts a blocked or unreviewed AI candidate', async () => {
@@ -306,8 +445,25 @@ test('never adopts a blocked or unreviewed AI candidate', async () => {
   const repository = { async create(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); }, async get(id) { return store.get(id); }, async save(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); } };
   const app = new AgentOrchestrator({ repository, tools: {} });
   const session = await app.createSession({ userId: 'u1', jdText: 'JD', resumeText: 'resume' });
-  session.tasks = [{ id: 'task-1', factIds: [], state: 'generation_failed', candidate: { text: 'unsafe', verification: { status: 'blocked' } } }];
+  session.tasks = [{ id: 'task-1', factIds: [], state: 'awaiting_user_decision', candidate: { text: 'unsafe', verification: { status: 'blocked' } } }];
   await assert.rejects(() => app.decide(session.id, 'u1', 'task-1', { type: 'accepted' }), /CANDIDATE_NOT_ADOPTABLE/);
+});
+
+test('never adopts an unavailable candidate', async () => {
+  const store = new Map();
+  const repository = { async create(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); }, async get(id) { return store.get(id); }, async save(v) { store.set(v.id, structuredClone(v)); return store.get(v.id); } };
+  const app = new AgentOrchestrator({ repository, tools: {} });
+  const session = await app.createSession({ userId: 'u1', jdText: 'JD', resumeText: 'resume' });
+  session.tasks = [{
+    id: 'task-1',
+    factIds: [],
+    state: 'awaiting_user_decision',
+    candidate: { text: 'pending review', verification: { status: 'unavailable' } },
+  }];
+  await assert.rejects(
+    () => app.decide(session.id, 'u1', 'task-1', { type: 'accepted' }),
+    /CANDIDATE_NOT_ADOPTABLE/,
+  );
 });
 
 function makeValidationHarness(judgeResult) {

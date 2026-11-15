@@ -4,11 +4,15 @@ const { AUDIT_REVISION_PROMPT } = require('../../utils/promptTemplates');
 const { evaluateCandidate, evaluationVersion } = require('./pf002Evaluator');
 
 const PROMPT_VERSION = 'pf002-audit-prompt-1';
+// 推理模型的 reasoning_tokens 也计入 max_tokens；1600 会被推理耗尽，
+// 导致 finish_reason=length 且 content 为空。结构化审核输出不允许截断。
+const SEMANTIC_AUDIT_MAX_TOKENS = 8192;
 
 async function defaultJudge(input) {
   return deepseekService.chatJSON(AUDIT_REVISION_PROMPT(input), {
     temperature: 0,
-    maxTokens: 1600,
+    maxTokens: SEMANTIC_AUDIT_MAX_TOKENS,
+    rejectTruncated: true,
   });
 }
 
@@ -36,12 +40,13 @@ class AgentAuditService {
         throw new Error('UNKNOWN_SEMANTIC_FACT_REF');
       }
     } catch (error) {
+      const finding = { type: 'semantic_audit_unavailable', message: error.message };
+      // 保留服务层错误码，便于区分截断、非法 JSON、超时和契约失败。
+      if (error.code) finding.code = error.code;
+      if (error.finishReason) finding.finishReason = error.finishReason;
       return {
         status: 'unavailable',
-        findings: [
-          ...(deterministic.findings || []),
-          { type: 'semantic_audit_unavailable', message: error.message },
-        ],
+        findings: [...(deterministic.findings || []), finding],
         supportedClaims: [],
         unsupportedClaims: [],
         factRefs: deterministic.factRefs || [],
@@ -78,3 +83,4 @@ class AgentAuditService {
 module.exports = new AgentAuditService();
 module.exports.AgentAuditService = AgentAuditService;
 module.exports.PROMPT_VERSION = PROMPT_VERSION;
+module.exports.SEMANTIC_AUDIT_MAX_TOKENS = SEMANTIC_AUDIT_MAX_TOKENS;

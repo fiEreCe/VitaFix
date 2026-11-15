@@ -48,9 +48,14 @@ class DeepSeekService {
   }
 
   _publicError(error) {
-    return new Error(error.response
+    const wrapped = new Error(error.response
       ? `DeepSeek API 请求失败: ${error.response.status}`
       : `DeepSeek API 请求失败: ${error.message}`);
+    // 保留诊断信息，调用方需要区分截断、非法 JSON、超时和契约失败。
+    for (const key of ['code', 'finishReason', 'usage', 'model', 'contentLength', 'durationMs']) {
+      if (error[key] !== undefined) wrapped[key] = error[key];
+    }
+    return wrapped;
   }
 
   async chat(prompt, options = {}, retries = 2) {
@@ -58,7 +63,10 @@ class DeepSeekService {
     try {
       for (let attempt = 0; attempt <= retries; attempt += 1) {
         try {
-          const response = await this.client.post('/chat/completions', this._buildPayload(prompt, options));
+          const startedAt = Date.now();
+          const payload = this._buildPayload(prompt, options);
+          const response = await this.client.post('/chat/completions', payload);
+          const durationMs = Date.now() - startedAt;
           const choice = response.data?.choices?.[0];
           const content = typeof choice?.message?.content === 'string' ? choice.message.content : '';
           const text = content.trim();
@@ -67,25 +75,36 @@ class DeepSeekService {
           // 结构化 JSON 被截断时不能作为有效结果使用
           if (options.rejectTruncated && finishReason === 'length') {
             console.error('[DeepSeek] 返回内容被截断', {
-              model: this._buildPayload(prompt, options).model,
+              model: payload.model,
               providerRequestId: response.data?.id,
               finishReason,
+              maxTokens: payload.max_tokens,
               promptChars: prompt.length,
+              contentLength: content.length,
+              durationMs,
               messageKeys: choice?.message ? Object.keys(choice.message) : [],
               usage: response.data?.usage,
             });
             const error = new Error('AI 返回内容被截断');
             error.code = 'AI_RESPONSE_TRUNCATED';
+            error.finishReason = finishReason;
+            error.usage = response.data?.usage;
+            error.model = payload.model;
+            error.contentLength = content.length;
+            error.durationMs = durationMs;
             throw error;
           }
 
           // 只记录元数据，不记录提示词/简历正文
           if (!text) {
             console.error('[DeepSeek] 返回空内容', {
-              model: this._buildPayload(prompt, options).model,
+              model: payload.model,
               providerRequestId: response.data?.id,
-              finishReason: choice?.finish_reason,
+              finishReason,
+              maxTokens: payload.max_tokens,
               promptChars: prompt.length,
+              contentLength: content.length,
+              durationMs,
               messageKeys: choice?.message ? Object.keys(choice.message) : [],
               usage: response.data?.usage,
             });
@@ -109,7 +128,9 @@ class DeepSeekService {
       return JSON.parse((jsonMatch ? jsonMatch[1] || jsonMatch[0] : text).trim());
     } catch (error) {
       console.error('Failed to parse AI response as JSON:', { errorName: error.name, responseLength: text.length });
-      throw new Error('AI 返回结果解析失败，请重试');
+      const wrapped = new Error('AI 返回结果解析失败，请重试');
+      wrapped.code = text ? 'AI_RESPONSE_INVALID_JSON' : 'AI_RESPONSE_EMPTY';
+      throw wrapped;
     }
   }
 

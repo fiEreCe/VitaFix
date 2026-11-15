@@ -30,7 +30,9 @@ test('JSON parse failure never logs the raw model output', async () => {
   const original = console.error;
   const logged = [];
   console.error = (...args) => logged.push(args.join(' '));
-  await assert.rejects(service.chatJSON('prompt'), /AI 返回结果解析失败/);
+  await assert.rejects(service.chatJSON('prompt'), (error) => (
+    error.code === 'AI_RESPONSE_INVALID_JSON' && /AI 返回结果解析失败/.test(error.message)
+  ));
   console.error = original;
   assert.equal(logged.join(' ').includes('private resume text'), false);
 });
@@ -61,7 +63,50 @@ test('rejectTruncated rejects finish_reason=length even when content is valid JS
   try {
     await assert.rejects(
       service.chatJSON('prompt', { rejectTruncated: true }),
-      /AI 返回内容被截断/,
+      (error) => (
+        error.code === 'AI_RESPONSE_TRUNCATED'
+        && error.finishReason === 'length'
+        && /AI 返回内容被截断/.test(error.message)
+      ),
+    );
+  } finally {
+    console.error = original;
+  }
+  assert.equal(calls, 1, 'truncation should not be retried');
+});
+
+test('rejectTruncated rejects finish_reason=length with empty content before parsing', async () => {
+  let calls = 0;
+  const service = new DeepSeekService({
+    client: {
+      post: async () => {
+        calls += 1;
+        return {
+          data: {
+            id: 'truncated-empty',
+            choices: [{
+              message: { role: 'assistant', content: '' },
+              finish_reason: 'length',
+            }],
+            usage: { completion_tokens: 1600, completion_tokens_details: { reasoning_tokens: 1600 } },
+          },
+        };
+      },
+    },
+    delay: async () => {},
+  });
+
+  const original = console.error;
+  console.error = () => {};
+  try {
+    await assert.rejects(
+      service.chatJSON('prompt', { rejectTruncated: true }),
+      (error) => (
+        error.code === 'AI_RESPONSE_TRUNCATED'
+        && error.finishReason === 'length'
+        && error.contentLength === 0
+        && error.usage?.completion_tokens_details?.reasoning_tokens === 1600
+      ),
     );
   } finally {
     console.error = original;
@@ -103,10 +148,30 @@ test('empty content is rejected as a JSON parse failure', async () => {
   const original = console.error;
   console.error = () => {};
   try {
-    await assert.rejects(service.chatJSON('prompt', { rejectTruncated: true }), /AI 返回结果解析失败/);
+    await assert.rejects(service.chatJSON('prompt', { rejectTruncated: true }), (error) => (
+      error.code === 'AI_RESPONSE_EMPTY' && /AI 返回结果解析失败/.test(error.message)
+    ));
   } finally {
     console.error = original;
   }
+});
+
+test('timeout errors retain their diagnostic code after wrapping', async () => {
+  let calls = 0;
+  const service = new DeepSeekService({
+    client: {
+      post: async () => {
+        calls += 1;
+        throw Object.assign(new Error('timeout of 120000ms exceeded'), { code: 'ECONNABORTED' });
+      },
+    },
+    delay: async () => {},
+  });
+
+  await assert.rejects(service.chatJSON('prompt'), (error) => (
+    error.code === 'ECONNABORTED' && /DeepSeek API 请求失败/.test(error.message)
+  ));
+  assert.equal(calls, 3, 'network errors are retried twice');
 });
 
 test('syntactically truncated JSON is rejected', async () => {
