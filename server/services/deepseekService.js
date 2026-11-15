@@ -33,6 +33,7 @@ class DeepSeekService {
   }
 
   _isRetryable(error) {
+    if (error.code === 'AI_RESPONSE_TRUNCATED') return false;
     if (!error.response) return true;
     return error.response.status >= 500 || error.response.status === 429;
   }
@@ -58,7 +59,39 @@ class DeepSeekService {
       for (let attempt = 0; attempt <= retries; attempt += 1) {
         try {
           const response = await this.client.post('/chat/completions', this._buildPayload(prompt, options));
-          return response.data.choices[0].message.content.trim();
+          const choice = response.data?.choices?.[0];
+          const content = typeof choice?.message?.content === 'string' ? choice.message.content : '';
+          const text = content.trim();
+          const finishReason = choice?.finish_reason;
+
+          // 结构化 JSON 被截断时不能作为有效结果使用
+          if (options.rejectTruncated && finishReason === 'length') {
+            console.error('[DeepSeek] 返回内容被截断', {
+              model: this._buildPayload(prompt, options).model,
+              providerRequestId: response.data?.id,
+              finishReason,
+              promptChars: prompt.length,
+              messageKeys: choice?.message ? Object.keys(choice.message) : [],
+              usage: response.data?.usage,
+            });
+            const error = new Error('AI 返回内容被截断');
+            error.code = 'AI_RESPONSE_TRUNCATED';
+            throw error;
+          }
+
+          // 只记录元数据，不记录提示词/简历正文
+          if (!text) {
+            console.error('[DeepSeek] 返回空内容', {
+              model: this._buildPayload(prompt, options).model,
+              providerRequestId: response.data?.id,
+              finishReason: choice?.finish_reason,
+              promptChars: prompt.length,
+              messageKeys: choice?.message ? Object.keys(choice.message) : [],
+              usage: response.data?.usage,
+            });
+          }
+
+          return text;
         } catch (error) {
           if (attempt === retries || !this._isRetryable(error)) throw this._publicError(error);
           await this.delay(1000 * (attempt + 1));

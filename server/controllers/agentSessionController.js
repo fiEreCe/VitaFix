@@ -63,7 +63,7 @@ function createAgentSessionRepository() {
           },
         },
       }],
-      { new: true },
+      { new: true, updatePipeline: true },
     ),
     async saveAnalysis(value, userId, token, { clearClaim = false } = {}) {
       const updated = await AgentSession.findOneAndUpdate(
@@ -99,7 +99,23 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
   const app = orchestrator || new AgentOrchestrator({ repository, tools });
   const getInputs = loadInputs || loadOwnedInputs;
   const ensureOwned = async (req) => { if (!await repository.get(req.params.id, req.userId)) throw new Error('AGENT_SESSION_NOT_FOUND'); };
-  const command = (fn) => async (req, res) => { try { await ensureOwned(req); res.json(await fn(req)); } catch (error) { sendError(res, error); } };
+  const command = (fn) => async (req, res) => {
+    try {
+      await ensureOwned(req);
+      res.json(await fn(req));
+    } catch (error) {
+      // 只记录请求标识和异常，不记录 inputSnapshot / 简历正文 / 用户回答
+      console.error('[Agent] command failed', {
+        action: `${req.method} ${req.originalUrl}`,
+        sessionId: req.params.id,
+        userId: req.userId,
+        errorName: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+      sendError(res, error);
+    }
+  };
 
   return {
     async create(req, res) { try { const { jdId, resumeId } = req.body || {}; if (!jdId || !resumeId) throw new Error('INPUT_REQUIRED'); const input = await getInputs(jdId, resumeId, req.userId); const session = await app.createSession({ userId: req.userId, jdId, resumeId, ...input }); res.status(201).json({ id: session.id || session._id.toString(), state: session.state }); } catch (error) { sendError(res, error); } },

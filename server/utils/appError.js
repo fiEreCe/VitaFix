@@ -68,6 +68,8 @@ function toErrorResponse(error) {
 
 function sendError(res, error) {
   const { status, body } = toErrorResponse(error);
+  const requestId = res.locals?.requestId;
+  if (requestId) body.error.requestId = requestId;
   return res.status(status).json(body);
 }
 

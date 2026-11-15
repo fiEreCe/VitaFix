@@ -6,15 +6,21 @@ import { getDeviceId } from '../utils/id.js'
 
 export function readError(payload, status) {
   const value = payload?.error
+  const requestId = value?.requestId || payload?.requestId
+  let error
+
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const error = new Error(
+    error = new Error(
       typeof value.message === 'string' && value.message ? value.message : `HTTP ${status}`,
     )
     if (typeof value.code === 'string') error.code = value.code
     error.retryable = Boolean(value.retryable)
-    return error
+  } else {
+    error = new Error(typeof value === 'string' && value ? value : `HTTP ${status}`)
   }
-  return new Error(typeof value === 'string' && value ? value : `HTTP ${status}`)
+
+  if (typeof requestId === 'string' && requestId) error.requestId = requestId
+  return error
 }
 
 /** 获取用户标识头 */

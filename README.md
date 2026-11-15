@@ -160,6 +160,7 @@ npm.cmd run build
 - **前端 → Vercel**：Vite 静态托管（根目录 `vercel.json` 已配置构建与路由）。
 - **后端 → Railway**：Express API 保持在线；Vercel 将 `/api/*` 反向代理到 `https://vitafix-production.up.railway.app/api/*`（浏览器同源，无需 CORS 处理）。
 - 前端使用相对路径 `/api`，无需前端环境变量。
+- 后端地址在三处声明：`vercel.json` 的 `/api/(.*)` rewrite、`api/resume/upload.js`、`api/jd/ocr.js`。后两者可用 Vercel 环境变量 `RAILWAY_API_BASE` 覆盖；更换 Railway 域名时三处必须同步，`server/test/deploymentConfig.test.js` 会校验一致性。
 
 ### Vercel 接入（首次）
 
@@ -172,8 +173,8 @@ npm.cmd run build
 
 - **本地代码与自动化基线**：已完成（见上文质量基线）。
 - **真实数据迁移**：已完成。所有权迁移（dry-run + 正式）在确认备份后执行：0 冲突、15 条历史孤立记录按设计保留；Supplement 部分唯一索引已在真实 MongoDB 验证存在。
-- **公开部署验证**：进行中。Vercel 部署 + 公开 URL 回归与人工烟测完成后，才视为 V0.1 正式发布；**在验证完成前不宣称已发布**。
-- 后端生产环境需配置 `MONGODB_URI`、`DEEPSEEK_API_KEY`、`NODE_ENV=production`（Railway 侧已配置）。
+- **公开部署验证**：后端访问已恢复（2026-11-15）。Railway `https://vitafix-production.up.railway.app/api/health` 返回 200；Vercel `https://vita-fix.vercel.app/api/health` 返回 200 且透传 `X-Powered-By: Express`；业务接口返回契约内响应。域名未变化，三处代理地址无需调整。人工 UI 烟测仍待完成。
+- 后端生产环境需配置 `MONGODB_URI`、`DEEPSEEK_API_KEY`；建议显式设置 `NODE_ENV=production`。Railway 启动命令与健康检查已写入 `railway.json`（`/api/health`）。
 
 ---
 

@@ -81,7 +81,7 @@
             id="resume-file"
             class="file-input"
             type="file"
-            accept=".pdf,.docx,.doc,.txt"
+            accept=".pdf,.docx,.txt"
             aria-label="上传简历文件"
             :aria-busy="uploading"
             :disabled="uploading"
@@ -247,7 +247,7 @@ async function uploadFile(file) {
   if (uploading.value) return
 
   const ext = '.' + file.name.split('.').pop().toLowerCase()
-  const allowed = ['.pdf', '.docx', '.doc', '.txt']
+  const allowed = ['.pdf', '.docx', '.txt']
   if (!allowed.includes(ext)) {
     showToast('仅支持 PDF、DOCX、TXT 格式')
     return
@@ -264,7 +264,9 @@ async function uploadFile(file) {
     showToast('识别成功，请核对结果')
   } catch (e) {
     uploadedFile.value = null
-    showToast('解析失败: ' + e.message)
+    const requestId = e.requestId ? `（请求ID: ${e.requestId}）` : ''
+    console.error('简历上传失败', { code: e.code, requestId: e.requestId })
+    showToast('解析失败: ' + e.message + requestId)
   } finally {
     uploading.value = false
   }

@@ -52,16 +52,20 @@ class AgentToolService {
     }) };
   }
   async assessAnswer(input) {
+    // 推理模型的 reasoning_tokens 也计入 max_tokens；1000 会被推理耗尽导致 content 为空。
     const result = await this.ai.chatJSON(ASSESS_ANSWER_PROMPT(input), {
       temperature: 0,
-      maxTokens: 1000,
+      maxTokens: 8192,
+      rejectTruncated: true,
     });
     return validateToolResult('assessAnswer', result);
   }
   async evaluateModification(input) {
+    // 同一模型下 1600 也可能被推理耗尽；结构化输出不允许截断。
     const result = await this.ai.chatJSON(MODIFICATION_VALIDATION_PROMPT(input), {
       temperature: 0,
-      maxTokens: 1600,
+      maxTokens: 8192,
+      rejectTruncated: true,
     });
     return validateToolResult('evaluateModification', result);
   }

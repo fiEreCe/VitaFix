@@ -53,7 +53,7 @@ class MatchAnalyzer {
     const prompt = MATCH_ANALYSIS_PROMPT(jdParsed, resumeParsed, supplements, skillSynonyms);
     const result = await deepseekService.chatJSON(prompt, {
       temperature: 0.15, // 稍降温度，提高一致性
-      maxTokens: 8192,   // 分析结果较长，需要更多token
+      maxTokens: 16384,  // 分析结果较长；推理模型的 reasoning_tokens 也计入上限
     });
 
     // 校验并修正结果

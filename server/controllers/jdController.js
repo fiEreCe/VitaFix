@@ -1,6 +1,7 @@
 const JD = require('../models/JD');
 const jdParser = require('../services/jdParser');
 const ocrService = require('../services/ocrService');
+const ocrTextCleaner = require('../services/ocrTextCleaner');
 const { publicError, sendError } = require('../utils/appError');
 
 exports.create = async (req, res) => {
@@ -40,13 +41,25 @@ exports.ocr = async (req, res) => {
       return sendError(res, publicError('INVALID_IMAGE_TYPE', '仅支持图片格式（JPG/PNG）'));
     }
 
-    // 仅 OCR 提取文字
-    const rawText = await ocrService.extractText(imageBuffer, mimeType);
-    if (!rawText || rawText.trim().length === 0) {
+    // 1. OCR 提取原始文字
+    const rawOcrText = await ocrService.extractText(imageBuffer, mimeType);
+    if (!rawOcrText || rawOcrText.trim().length === 0) {
       return sendError(res, publicError('OCR_TEXT_NOT_FOUND', '未从图片中识别出文字，请确认图片清晰'));
     }
 
-    res.json({ rawText });
+    // 2. 独立后处理：去网页 UI、修中文空格、恢复段落（不改写岗位内容）
+    const { text: rawText, stats } = ocrTextCleaner.cleanOcrText(rawOcrText);
+    if (!rawText) {
+      return sendError(res, publicError('OCR_TEXT_NOT_FOUND', '未从图片中识别出有效的岗位文字，请确认图片清晰'));
+    }
+
+    console.log(
+      `[OCR] 原始 ${stats.originalLength} 字符 / 清洗后 ${stats.cleanedLength} 字符，`
+      + `移除 UI 行 ${stats.removedUiLines}，合并续行 ${stats.mergedLines}`,
+    );
+
+    // 保留原始识别结果供排查，前端展示清洗后的 rawText
+    res.json({ rawText, rawOcrText, cleanup: stats });
   } catch (error) {
     console.error('OCR识别失败:', error);
     sendError(res, error);

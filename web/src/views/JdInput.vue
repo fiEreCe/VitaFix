@@ -95,7 +95,7 @@
           block
           round
           :loading="submitting"
-          :disabled="!(jdText.trim() || ocrText.trim())"
+          :disabled="!canSubmit"
           @click="submitJD"
         >
           解析JD
@@ -164,7 +164,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { jdApi } from '../api'
@@ -174,6 +174,7 @@ const router = useRouter()
 const method = ref('text')
 const jdText = ref('')
 const ocrText = ref('')
+const rawOcrText = ref('')  // 保留原始 OCR，便于排查识别问题
 const submitting = ref(false)
 const ocrLoading = ref(false)
 const showResult = ref(false)
@@ -182,6 +183,15 @@ const currentJdId = ref('')
 const imagePreview = ref('')
 
 const inputMethods = ['text', 'image']
+
+// 按当前输入方式取文本：图片模式优先 OCR 结果，文本模式优先手输内容
+function activeText() {
+  const primary = method.value === 'image' ? ocrText.value : jdText.value
+  const fallback = method.value === 'image' ? jdText.value : ocrText.value
+  return (primary || fallback || '').trim()
+}
+
+const canSubmit = computed(() => Boolean(activeText()))
 
 function handleMethodKeydown(event) {
   const currentIndex = inputMethods.indexOf(method.value)
@@ -204,6 +214,7 @@ async function handleImageUpload(file) {
   try {
     const res = await jdApi.ocr(file.file)
     ocrText.value = res.rawText
+    rawOcrText.value = res.rawOcrText || res.rawText || ''
     imagePreview.value = file.content
     // 保留图片预览，显示识别出的文字让用户确认/编辑
     // 用户修改完后自行点击"解析JD"按钮
@@ -217,7 +228,7 @@ async function handleImageUpload(file) {
 
 // 提交JD
 async function submitJD() {
-  const text = (jdText.value || ocrText.value || '').trim()
+  const text = activeText()
   if (!text) {
     showToast('请输入JD内容')
     return
