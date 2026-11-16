@@ -24,6 +24,19 @@ describe('StatusPanel', () => {
     expect(wrapper.emitted('retry')).toHaveLength(1)
   })
 
+  it('supports a custom action label for restart paths', () => {
+    const wrapper = mount(StatusPanel, {
+      props: {
+        kind: 'error',
+        title: '会话不存在',
+        retryable: true,
+        actionLabel: '重新开始',
+      },
+    })
+
+    expect(wrapper.get('button').text()).toBe('重新开始')
+  })
+
   it('announces loading state politely', () => {
     const wrapper = mount(StatusPanel, {
       props: {

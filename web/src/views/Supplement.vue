@@ -87,7 +87,8 @@
           type="primary"
           block
           round
-          :loading="saving"
+          :loading="saving || analysisStarting"
+          :disabled="saving || analysisStarting"
           @click="saveAndAnalyze"
         >
           {{ items.length > 0 ? '保存并开始分析' : '跳过，直接分析' }}
@@ -103,6 +104,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { supplementApi, agentSessionApi } from '../api'
 import { events } from '../utils/analytics'
+import { findAgentRecovery, saveAgentRecovery } from '../utils/agentRecovery'
 import AppPage from '../components/ui/AppPage.vue'
 
 const route = useRoute()
@@ -112,6 +114,8 @@ const router = useRouter()
 const resumeId = computed(() => route.query.resumeId || localStorage.getItem('pendingResumeId') || '')
 const jdId = computed(() => route.query.jdId || localStorage.getItem('pendingJdId') || '')
 const skipSupplement = computed(() => route.query.skip === '1')
+// 用户明确要求重新开始时，不再复用同输入的旧会话
+const forceFresh = computed(() => route.query.fresh === '1')
 
 const items = ref([])
 const saving = ref(false)
@@ -156,6 +160,7 @@ function removeItem(idx) {
 }
 
 async function saveAndAnalyze() {
+  if (saving.value || analysisStarting.value) return
   if (!resumeId.value || !jdId.value) {
     showToast('数据不完整，请重新开始')
     return
@@ -180,14 +185,27 @@ async function startAnalysis() {
   if (analysisStarting.value) return
   analysisStarting.value = true
   try {
-    const res = await agentSessionApi.create(jdId.value, resumeId.value)
-    await agentSessionApi.start(res.id)
-    events.analysisStarted()
-    // 清理 localStorage 中的暂存数据
+    // 同一设备、同一 JD/Resume 已有未完成会话时继续使用它，避免重复创建。
+    const recovery = forceFresh.value
+      ? null
+      : findAgentRecovery({ jdId: jdId.value, resumeId: resumeId.value })
+    let sessionId = recovery?.id
+    let created = false
+
+    if (!sessionId) {
+      const res = await agentSessionApi.create(jdId.value, resumeId.value)
+      sessionId = res.id
+      created = true
+      saveAgentRecovery({ id: sessionId, jdId: jdId.value, resumeId: resumeId.value })
+    }
+
+    if (created) events.analysisStarted()
+    // 清理输入页的暂存数据；会话恢复信息独立保存，供启动失败后继续使用。
     localStorage.removeItem('pendingResumeId')
     localStorage.removeItem('pendingJdId')
-    showToast('分析已启动')
-    router.replace(`/agent/${res.id}`)
+    showToast(created ? '分析任务已创建' : '继续上次未完成的分析')
+    // 立即进入工作台，由工作台加载服务端状态并启动/等待/恢复任务。
+    await router.replace(`/agent/${sessionId}`)
   } catch (e) {
     showToast('启动分析失败: ' + e.message)
   } finally {

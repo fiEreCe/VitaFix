@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import JdInput from '../../src/views/JdInput.vue'
 import ResumeInput from '../../src/views/ResumeInput.vue'
+import { saveAgentRecovery } from '../../src/utils/agentRecovery.js'
 
 const {
   push,
@@ -56,6 +57,7 @@ describe('input flow semantics', () => {
     resumeUpload.mockReset()
     agentCreate.mockReset()
     agentStart.mockReset()
+    localStorage.clear()
     Object.keys(routeQuery).forEach((key) => delete routeQuery[key])
     routeQuery.jdId = 'jd-1'
   })
@@ -162,7 +164,7 @@ describe('input flow semantics', () => {
     expect(source).toMatch(/<van-icon\s+name="cross"\s+aria-hidden="true"/)
   })
 
-  it('does not start a second analysis while skip auto-start is in flight', async () => {
+  it('creates the session once, saves recovery, and enters the workbench immediately', async () => {
     let resolveCreate
     agentCreate.mockReturnValue(new Promise((resolve) => {
       resolveCreate = resolve
@@ -182,9 +184,47 @@ describe('input flow semantics', () => {
 
     resolveCreate({ id: 'session-1' })
     await flushPromises()
-    expect(agentStart).toHaveBeenCalledTimes(1)
+    // 启动交由工作台负责，进入页面不依赖 start 响应。
+    expect(agentStart).not.toHaveBeenCalled()
     expect(replace).toHaveBeenCalledWith('/agent/session-1')
     expect(agentCreate).toHaveBeenCalledTimes(1)
+
+    const record = JSON.parse(localStorage.getItem(Object.keys(localStorage).find((key) => key.startsWith('jingzhu_agent_pending_session'))))
+    expect(record).toMatchObject({ id: 'session-1', jdId: 'jd-1', resumeId: 'resume-1' })
+    expect(localStorage.getItem('pendingResumeId')).toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('reuses the saved session for the same JD and resume instead of creating another one', async () => {
+    routeQuery.jdId = 'jd-1'
+    routeQuery.resumeId = 'resume-1'
+    routeQuery.skip = '1'
+    saveAgentRecovery({ id: 'session-existing', jdId: 'jd-1', resumeId: 'resume-1' })
+
+    const { default: Supplement } = await import('../../src/views/Supplement.vue')
+    const wrapper = mount(Supplement)
+    await flushPromises()
+
+    expect(agentCreate).not.toHaveBeenCalled()
+    expect(replace).toHaveBeenCalledWith('/agent/session-existing')
+
+    wrapper.unmount()
+  })
+
+  it('does not reuse a saved session that belongs to other inputs', async () => {
+    routeQuery.jdId = 'jd-1'
+    routeQuery.resumeId = 'resume-1'
+    routeQuery.skip = '1'
+    saveAgentRecovery({ id: 'session-other', jdId: 'jd-1', resumeId: 'resume-other' })
+    agentCreate.mockResolvedValue({ id: 'session-new' })
+
+    const { default: Supplement } = await import('../../src/views/Supplement.vue')
+    const wrapper = mount(Supplement)
+    await flushPromises()
+
+    expect(agentCreate).toHaveBeenCalledTimes(1)
+    expect(replace).toHaveBeenCalledWith('/agent/session-new')
 
     wrapper.unmount()
   })

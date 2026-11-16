@@ -19,6 +19,7 @@ export function readError(payload, status) {
     error = new Error(typeof value === 'string' && value ? value : `HTTP ${status}`)
   }
 
+  error.status = status
   if (typeof requestId === 'string' && requestId) error.requestId = requestId
   return error
 }

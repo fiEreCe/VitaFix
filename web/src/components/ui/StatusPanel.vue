@@ -18,6 +18,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  actionLabel: {
+    type: String,
+    default: '重试',
+  },
 })
 
 defineEmits(['retry'])
@@ -41,7 +45,7 @@ const live = computed(() => (props.kind === 'error' ? 'assertive' : 'polite'))
       type="button"
       @click="$emit('retry')"
     >
-      重试
+      {{ actionLabel }}
     </button>
   </section>
 </template>

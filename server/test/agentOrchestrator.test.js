@@ -2,6 +2,163 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { AgentOrchestrator } = require('../services/agent/agentOrchestrator');
 
+function makeAnalysisHarness({ state = 'draft', expiresAt = null } = {}) {
+  const now = new Date('2026-01-01T00:00:00.000Z');
+  let parseCalls = 0;
+  const store = {
+    id: 'session-1',
+    userId: 'u1',
+    state,
+    inputSnapshot: { jdText: 'JD', resumeText: '简历' },
+    requirements: [],
+    resumeFacts: [],
+    matches: [],
+    tasks: [],
+    transitions: [],
+    analysisClaimToken: state === 'parsing' ? 'live-token' : undefined,
+    analysisClaimExpiresAt: expiresAt ? new Date(expiresAt) : undefined,
+  };
+
+  const repository = {
+    async create(value) {
+      Object.assign(store, structuredClone(value));
+      return structuredClone(store);
+    },
+    async get(id, userId) {
+      return id === store.id && userId === store.userId ? structuredClone(store) : null;
+    },
+    async save(value, userId) {
+      assert.equal(userId, store.userId);
+      Object.assign(store, structuredClone(value));
+      return structuredClone(store);
+    },
+    async claimAnalysis(id, userId, claim) {
+      if (id !== store.id || userId !== store.userId) return null;
+      const at = new Date(claim.at);
+      const startable = claim.fromStates.includes(store.state);
+      const activeExpired = claim.activeStates.includes(store.state) && (
+        !store.analysisClaimExpiresAt
+        || new Date(store.analysisClaimExpiresAt).getTime() <= at.getTime()
+      );
+      if (!startable && !activeExpired) return null;
+
+      const from = store.state;
+      store.state = claim.to;
+      store.analysisClaimToken = claim.token;
+      store.analysisClaimExpiresAt = claim.expiresAt;
+      store.transitions.push({
+        from,
+        to: claim.to,
+        event: activeExpired ? claim.recoveryEvent : claim.event,
+        toolName: claim.toolName,
+        at: claim.at,
+      });
+      return structuredClone(store);
+    },
+    async renewAnalysisClaim(id, userId, token, nextExpiresAt) {
+      if (id !== store.id || userId !== store.userId || store.analysisClaimToken !== token) return null;
+      store.analysisClaimExpiresAt = nextExpiresAt;
+      return structuredClone(store);
+    },
+    async saveAnalysis(value, userId, token, { clearClaim = false } = {}) {
+      if (userId !== store.userId || store.analysisClaimToken !== token) {
+        throw new Error('AGENT_ANALYSIS_CLAIM_LOST');
+      }
+      for (const key of [
+        'state', 'currentStep', 'inputSnapshot', 'requirements',
+        'resumeFacts', 'matches', 'tasks', 'transitions',
+      ]) {
+        store[key] = value[key];
+      }
+      if (clearClaim) {
+        delete store.analysisClaimToken;
+        delete store.analysisClaimExpiresAt;
+      }
+      return structuredClone(store);
+    },
+  };
+
+  const tools = {
+    async parseJD() {
+      parseCalls += 1;
+      return { requirements: [{ id: 'req-1', sourceText: '用户研究' }] };
+    },
+    async parseResume() {
+      return { facts: [{ id: 'fact-1', sourceText: '参与用户访谈', confirmation: 'confirmed' }] };
+    },
+    async matchEvidence() {
+      return {
+        matches: [{ requirementId: 'req-1', factIds: ['fact-1'], gapType: 'expression', priority: 1 }],
+      };
+    },
+  };
+
+  const app = new AgentOrchestrator({
+    repository,
+    tools,
+    clock: () => new Date(now),
+    scheduler: { setInterval: () => 0, clearInterval: () => {} },
+  });
+
+  return { app, store, parseCalls: () => parseCalls };
+}
+
+test('does not steal a live analysis lease and keeps waiting on the same session', async () => {
+  const harness = makeAnalysisHarness({
+    state: 'parsing',
+    expiresAt: '2026-01-01T00:10:00.000Z',
+  });
+
+  const result = await harness.app.startAnalysis('session-1', 'u1');
+
+  assert.equal(result.id, 'session-1');
+  assert.equal(result.state, 'parsing');
+  assert.equal(harness.parseCalls(), 0);
+  assert.equal(harness.store.analysisClaimToken, 'live-token');
+});
+
+test('recovers an expired analysis lease through the same session', async () => {
+  const harness = makeAnalysisHarness({
+    state: 'parsing',
+    expiresAt: '2025-12-31T23:59:00.000Z',
+  });
+
+  const result = await harness.app.startAnalysis('session-1', 'u1');
+
+  assert.equal(result.id, 'session-1');
+  assert.equal(result.state, 'evidence_ready');
+  assert.equal(harness.parseCalls(), 1);
+  assert.deepEqual(
+    harness.store.transitions.map((item) => item.event),
+    ['ANALYSIS_RECOVERED', 'INPUT_PARSED', 'TASKS_CREATED'],
+  );
+  assert.equal(harness.store.analysisClaimToken, undefined);
+  assert.equal(harness.store.analysisClaimExpiresAt, undefined);
+});
+
+test('retries a failed analysis with the same session instead of creating a new one', async () => {
+  const harness = makeAnalysisHarness({ state: 'parsing_failed' });
+
+  const result = await harness.app.startAnalysis('session-1', 'u1');
+
+  assert.equal(result.id, 'session-1');
+  assert.equal(result.state, 'evidence_ready');
+  assert.equal(harness.store.transitions[0].event, 'ANALYSIS_STARTED');
+});
+
+test('concurrent start requests keep a single analysis owner', async () => {
+  const harness = makeAnalysisHarness({ state: 'draft' });
+
+  const [first, second] = await Promise.all([
+    harness.app.startAnalysis('session-1', 'u1'),
+    harness.app.startAnalysis('session-1', 'u1'),
+  ]);
+
+  assert.equal(first.state, 'evidence_ready');
+  assert.equal(second.state, 'parsing');
+  assert.equal(harness.parseCalls(), 1);
+});
+
 function makeQuestioningHarness(assessments) {
   const store = new Map();
   let assessmentIndex = 0;
