@@ -68,3 +68,83 @@ test('claimAnalysis can recover active sessions only after their lease expires',
   assert.ok(activeBranch.$or.some((clause) => clause.analysisClaimExpiresAt === null));
   assert.ok(activeBranch.$or.some((clause) => clause.analysisClaimExpiresAt?.$exists === false));
 });
+
+test('list scopes by user, projects only summary fields, and paginates by updatedAt', async (t) => {
+  const originalFind = AgentSession.find;
+  const originalCountDocuments = AgentSession.countDocuments;
+  const captured = {};
+  const chain = {
+    select(value) { captured.select = value; return this; },
+    populate(value) { captured.populate = value; return this; },
+    sort(value) { captured.sort = value; return this; },
+    skip(value) { captured.skip = value; return this; },
+    limit(value) { captured.limit = value; return this; },
+    lean: async () => [{ _id: 'session-1', state: 'draft', tasks: [] }],
+  };
+  AgentSession.find = (filter) => {
+    captured.filter = filter;
+    return chain;
+  };
+  AgentSession.countDocuments = async (filter) => {
+    captured.countFilter = filter;
+    return 12;
+  };
+  t.after(() => {
+    AgentSession.find = originalFind;
+    AgentSession.countDocuments = originalCountDocuments;
+  });
+
+  const repository = createAgentSessionRepository();
+  const result = await repository.list({
+    userId: 'u1',
+    page: 3,
+    pageSize: 5,
+    sort: 'asc',
+  });
+
+  assert.deepEqual(captured.filter, { userId: 'u1' });
+  assert.deepEqual(captured.countFilter, { userId: 'u1' });
+  assert.match(captured.select, /tasks\.state/);
+  assert.doesNotMatch(captured.select, /inputSnapshot|resumeFacts|matches|handoff|requirements/);
+  assert.deepEqual(captured.populate, {
+    path: 'jdId',
+    select: 'parsed.company parsed.position',
+    match: { userId: 'u1' },
+  });
+  assert.deepEqual(captured.sort, { updatedAt: 1 });
+  assert.equal(captured.skip, 10);
+  assert.equal(captured.limit, 5);
+  assert.deepEqual(result, {
+    records: [{ _id: 'session-1', state: 'draft', tasks: [] }],
+    total: 12,
+  });
+});
+
+test('getForSummary only loads an owned session and validates JD ownership', async (t) => {
+  const originalFindOne = AgentSession.findOne;
+  const captured = {};
+  const chain = {
+    select(value) { captured.select = value; return this; },
+    populate(value) { captured.populate = value; return this; },
+    lean: async () => ({ _id: 'session-1', userId: 'u1' }),
+  };
+  AgentSession.findOne = (filter) => {
+    captured.filter = filter;
+    return chain;
+  };
+  t.after(() => {
+    AgentSession.findOne = originalFindOne;
+  });
+
+  const repository = createAgentSessionRepository();
+  const value = await repository.getForSummary('session-1', 'u1');
+
+  assert.deepEqual(captured.filter, { _id: 'session-1', userId: 'u1' });
+  assert.equal(captured.select, '-inputSnapshot');
+  assert.deepEqual(captured.populate, {
+    path: 'jdId',
+    select: 'parsed.company parsed.position',
+    match: { userId: 'u1' },
+  });
+  assert.equal(value.userId, 'u1');
+});

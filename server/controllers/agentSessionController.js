@@ -3,7 +3,19 @@ const JD = require('../models/JD');
 const Resume = require('../models/Resume');
 const { AgentOrchestrator } = require('../services/agent/agentOrchestrator');
 const tools = require('../services/agent/agentToolService');
+const {
+  buildSessionListItem,
+  buildSessionSummary,
+} = require('../services/agent/agentSummary');
 const { sendError } = require('../utils/appError');
+
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
+
+function positiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 async function loadOwnedInputs(jdId, resumeId, userId) {
   const [jd, resume] = await Promise.all([
@@ -91,14 +103,40 @@ function createAgentSessionRepository() {
       { $set: { analysisClaimExpiresAt: expiresAt } },
       { new: true },
     ),
+    list: async ({ userId, page, pageSize, sort }) => {
+      const query = { userId };
+      const [records, total] = await Promise.all([
+        AgentSession.find(query)
+          .select('state currentTaskId tasks.state jdId createdAt updatedAt')
+          .populate({
+            path: 'jdId',
+            select: 'parsed.company parsed.position',
+            match: { userId },
+          })
+          .sort({ updatedAt: sort === 'asc' ? 1 : -1 })
+          .skip((page - 1) * pageSize)
+          .limit(pageSize)
+          .lean(),
+        AgentSession.countDocuments(query),
+      ]);
+      return { records, total };
+    },
+    getForSummary: async (id, userId) => AgentSession.findOne({ _id: id, userId })
+      .select('-inputSnapshot')
+      .populate({
+        path: 'jdId',
+        select: 'parsed.company parsed.position',
+        match: { userId },
+      })
+      .lean(),
   };
 }
 
-function createAgentSessionController({ orchestrator, loadInputs } = {}) {
-  const repository = createAgentSessionRepository();
-  const app = orchestrator || new AgentOrchestrator({ repository, tools });
+function createAgentSessionController({ orchestrator, loadInputs, repository } = {}) {
+  const store = repository || createAgentSessionRepository();
+  const app = orchestrator || new AgentOrchestrator({ repository: store, tools });
   const getInputs = loadInputs || loadOwnedInputs;
-  const ensureOwned = async (req) => { if (!await repository.get(req.params.id, req.userId)) throw new Error('AGENT_SESSION_NOT_FOUND'); };
+  const ensureOwned = async (req) => { if (!await store.get(req.params.id, req.userId)) throw new Error('AGENT_SESSION_NOT_FOUND'); };
   const command = (fn) => async (req, res) => {
     try {
       await ensureOwned(req);
@@ -119,7 +157,34 @@ function createAgentSessionController({ orchestrator, loadInputs } = {}) {
 
   return {
     async create(req, res) { try { const { jdId, resumeId } = req.body || {}; if (!jdId || !resumeId) throw new Error('INPUT_REQUIRED'); const input = await getInputs(jdId, resumeId, req.userId); const session = await app.createSession({ userId: req.userId, jdId, resumeId, ...input }); res.status(201).json({ id: session.id || session._id.toString(), state: session.state }); } catch (error) { sendError(res, error); } },
-    async get(req, res) { try { const session = await repository.get(req.params.id, req.userId); if (!session) throw new Error('AGENT_SESSION_NOT_FOUND'); return res.json(session); } catch (error) { return sendError(res, error); } },
+    async list(req, res) {
+      try {
+        const page = positiveInteger(req.query?.page, 1);
+        const pageSize = Math.min(positiveInteger(req.query?.pageSize, DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE);
+        const sort = req.query?.sort === 'asc' ? 'asc' : 'desc';
+        const { records, total } = await store.list({ userId: req.userId, page, pageSize, sort });
+        const list = (records || []).map(buildSessionListItem);
+        return res.json({
+          list,
+          total,
+          page,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize),
+        });
+      } catch (error) {
+        return sendError(res, error);
+      }
+    },
+    async get(req, res) { try { const session = await store.get(req.params.id, req.userId); if (!session) throw new Error('AGENT_SESSION_NOT_FOUND'); return res.json(session); } catch (error) { return sendError(res, error); } },
+    async summary(req, res) {
+      try {
+        const session = await store.getForSummary(req.params.id, req.userId);
+        if (!session) throw new Error('AGENT_SESSION_NOT_FOUND');
+        return res.json(buildSessionSummary(session, { jd: session.jdId }));
+      } catch (error) {
+        return sendError(res, error);
+      }
+    },
     start: command((req) => app.startAnalysis(req.params.id, req.userId)),
     selectTask: command((req) => app.selectTask(req.params.id, req.userId, req.params.taskId)),
     answer: command((req) => { if (!req.body?.answer?.trim()) throw new Error('ANSWER_REQUIRED'); return app.submitAnswer(req.params.id, req.userId, req.params.taskId, req.body.answer.trim()); }),

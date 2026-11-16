@@ -33,6 +33,11 @@ const routes = [
     component: () => import('../views/History.vue'),
   },
   {
+    path: '/agent/:id/summary',
+    name: 'AgentSummary',
+    component: () => import('../views/AgentSummary.vue'),
+  },
+  {
     path: '/agent/:id',
     name: 'AgentWorkbench',
     component: () => import('../views/AgentWorkbench.vue'),

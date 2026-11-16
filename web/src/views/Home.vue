@@ -45,38 +45,56 @@
       <section class="section" aria-labelledby="history-title">
       <div class="section-header">
         <h2 id="history-title" class="section-title">历史记录</h2>
-        <button v-if="list.length > 0" class="section-more" @click="$router.push('/history')">
+        <button v-if="totalCount > 0" class="section-more" @click="$router.push('/history')">
           查看全部 &gt;
         </button>
       </div>
 
-      <div v-if="loading" class="empty-state">
+      <StatusPanel
+        v-if="error"
+        kind="error"
+        title="历史记录加载失败"
+        :message="error.message || '请检查网络后重试。'"
+        retryable
+        @retry="load"
+      />
+
+      <div v-else-if="loading" class="empty-state">
         <van-loading size="20">加载中...</van-loading>
       </div>
 
       <div v-else-if="list.length === 0" class="empty-state">
-        <p class="empty-text">还没有分析记录</p>
+        <p class="empty-text">还没有分析或优化记录</p>
       </div>
 
       <div v-else class="history-list">
         <RouterLink
-          v-for="item in list.slice(0, 5)"
-          :key="item.id"
+          v-for="item in list"
+          :key="entityKey(item)"
           class="history-card"
-          :to="`/result/${item.id}`"
+          :to="item.type === 'agent' ? `/agent/${item.id}` : `/result/${item.id}`"
         >
           <div class="card-left">
-            <div class="card-name">{{ item.name }}</div>
+            <div class="card-name">
+              <span class="type-pill">{{ item.type === 'agent' ? '优化会话' : '匹配分析' }}</span>
+              {{ item.type === 'agent' ? (item.title || '简历优化会话') : item.name }}
+            </div>
             <div class="card-meta">
               <span v-if="item.company">{{ item.company }}</span>
               <span v-if="item.company && item.position"> · </span>
               <span v-if="item.position">{{ item.position }}</span>
             </div>
-            <div class="card-time">{{ formatDate(item.createdAt) }}</div>
+            <div class="card-time">{{ formatDate(item.updatedAt || item.createdAt) }}</div>
           </div>
           <div class="card-right">
-            <div class="score-num" :style="{ color: getGradeColor(item.score) }">{{ item.score }}</div>
-            <div class="score-grade" :style="{ color: getGradeColor(item.score) }">{{ item.grade }}</div>
+            <template v-if="item.type === 'agent'">
+              <div class="agent-state">{{ sessionStateLabel(item.state) }}</div>
+              <div class="agent-progress">{{ taskProgress(item).text }}</div>
+            </template>
+            <template v-else>
+              <div class="score-num" :style="{ color: getGradeColor(item.score) }">{{ item.score }}</div>
+              <div class="score-grade" :style="{ color: getGradeColor(item.score) }">{{ item.grade }}</div>
+            </template>
           </div>
         </RouterLink>
       </div>
@@ -97,24 +115,44 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { historyApi } from '../api'
+import { agentSessionApi, historyApi } from '../api'
 import { formatDate, getGradeColor } from '../utils/format'
+import {
+  entityKey,
+  sessionStateLabel,
+  sortByRecent,
+  taskProgress,
+} from '../utils/agent'
 import AppPage from '../components/ui/AppPage.vue'
+import StatusPanel from '../components/ui/StatusPanel.vue'
 
 const router = useRouter()
 const list = ref([])
+const totalCount = ref(0)
 const loading = ref(true)
+const error = ref(null)
 
-onMounted(async () => {
+async function load() {
+  loading.value = true
+  error.value = null
   try {
-    const res = await historyApi.list({ page: 1, pageSize: 5 })
-    list.value = res.list || []
+    const [analysisRes, agentRes] = await Promise.all([
+      historyApi.list({ page: 1, pageSize: 5 }),
+      agentSessionApi.list({ page: 1, pageSize: 5 }),
+    ])
+    const analyses = (analysisRes.list || []).map((item) => ({ ...item, type: 'analysis' }))
+    const agents = (agentRes.list || []).map((item) => ({ ...item, type: 'agent' }))
+    list.value = [...analyses, ...agents].sort(sortByRecent).slice(0, 5)
+    totalCount.value = (analysisRes.total ?? analyses.length) + (agentRes.total ?? agents.length)
   } catch (e) {
     console.error('加载历史记录失败:', e)
+    error.value = e
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(load)
 
 function startNewAnalysis() {
   router.push('/jd-input')
@@ -333,6 +371,31 @@ function startNewAnalysis() {
   margin-bottom: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.type-pill {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-selected, #eef5ff);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+.agent-state {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.agent-progress {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 

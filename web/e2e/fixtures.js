@@ -8,6 +8,7 @@ export const routeCases = [
   { path: '/resume-input?jdId=jd-1', slug: 'resume-input' },
   { path: '/supplement?jdId=jd-1&resumeId=resume-1', slug: 'supplement' },
   { path: '/agent/session-1', slug: 'agent' },
+  { path: '/agent/session-1/summary', slug: 'agent-summary' },
   { path: '/result/analysis-1', slug: 'result' },
   { path: '/history', slug: 'history' },
   { path: '/demo', slug: 'demo', reducedMotion: true },
@@ -85,6 +86,136 @@ export const historyFixture = {
     score: 82,
     grade: '良好',
   }],
+  total: 1,
+}
+
+export const agentSessionListFixture = {
+  list: [{
+    id: 'session-1',
+    type: 'agent',
+    title: '示例组织 · 产品岗位',
+    company: '示例组织',
+    position: '产品岗位',
+    state: 'task_in_progress',
+    taskCount: 4,
+    completedCount: 2,
+    createdAt: '2026-08-08T00:00:00.000Z',
+    updatedAt: '2026-08-09T00:00:00.000Z',
+  }],
+  total: 1,
+  page: 1,
+  pageSize: 100,
+  totalPages: 1,
+}
+
+export const agentSummaryFixture = {
+  id: 'session-1',
+  state: 'ready_for_reevaluation',
+  title: '示例组织 · 产品岗位',
+  company: '示例组织',
+  position: '产品岗位',
+  createdAt: '2026-08-08T00:00:00.000Z',
+  updatedAt: '2026-08-09T00:00:00.000Z',
+  totals: {
+    taskCount: 5,
+    completedCount: 3,
+    adoptedCount: 2,
+    decisionPendingCount: 1,
+    draftCount: 1,
+    incompleteCount: 2,
+  },
+  tasks: [
+    {
+      id: 'task-1',
+      requirementText: '负责用户研究并形成洞察',
+      state: 'accepted',
+      expressionKind: 'adopted',
+      adopted: true,
+      completed: true,
+      decisionPending: false,
+      currentText: '完成用户研究并输出关键洞察',
+      candidateText: '完成用户研究并输出关键洞察',
+      originalText: '设计访谈提纲并访谈 8 位用户',
+      verificationStatus: 'passed',
+      riskAcknowledged: false,
+      risks: [],
+      validation: null,
+      facts: [{ id: 'fact-1', sourceText: '设计访谈提纲并访谈 8 位用户', confirmation: 'confirmed' }],
+      factRefs: ['fact-1'],
+    },
+    {
+      id: 'task-2',
+      requirementText: '推动跨团队协作',
+      state: 'completed_with_risk',
+      expressionKind: 'adopted_with_risk',
+      adopted: true,
+      completed: true,
+      decisionPending: false,
+      currentText: '独立推动 500 人跨团队协作',
+      candidateText: '独立推动 500 人跨团队协作',
+      originalText: '协调设计与研发完成两轮验证',
+      verificationStatus: 'blocked',
+      riskAcknowledged: true,
+      risks: [{ type: 'estimated_number', message: '数量缺少事实依据' }],
+      validation: { safetyStatus: 'blocked', stale: false },
+      facts: [{ id: 'fact-2', sourceText: '协调设计与研发完成两轮验证', confirmation: 'confirmed' }],
+      factRefs: ['fact-2'],
+    },
+    {
+      id: 'task-3',
+      requirementText: '数据分析',
+      state: 'user_edited',
+      expressionKind: 'draft',
+      adopted: false,
+      completed: false,
+      decisionPending: false,
+      currentText: '独立完成数据分析并复盘',
+      candidateText: '独立完成数据分析并复盘',
+      originalText: '参与数据整理',
+      verificationStatus: 'unverified_user_content',
+      riskAcknowledged: false,
+      risks: [],
+      validation: { safetyStatus: 'passed', stale: true },
+      facts: [],
+      factRefs: [],
+    },
+    {
+      id: 'task-4',
+      requirementText: '项目复盘',
+      state: 'awaiting_user_decision',
+      expressionKind: 'candidate',
+      adopted: false,
+      completed: false,
+      decisionPending: true,
+      currentText: '',
+      candidateText: '主导项目复盘并形成行动项',
+      originalText: '参与复盘会议',
+      verificationStatus: 'passed',
+      riskAcknowledged: false,
+      risks: [],
+      validation: null,
+      facts: [],
+      factRefs: [],
+    },
+    {
+      id: 'task-5',
+      requirementText: '行业研究',
+      state: 'skipped',
+      expressionKind: 'none',
+      adopted: false,
+      completed: true,
+      decisionPending: false,
+      currentText: '',
+      candidateText: '',
+      originalText: '暂无相关经历',
+      verificationStatus: 'not_applicable',
+      riskAcknowledged: false,
+      risks: [],
+      validation: null,
+      facts: [],
+      factRefs: [],
+    },
+  ],
 }
 
 const json = (route, body, status = 200) => route.fulfill({
@@ -102,6 +233,12 @@ export async function installApiMocks(page) {
 
     if (method === 'POST' && path === '/api/track') return json(route, { accepted: true })
 
+    if (method === 'GET' && path === '/api/agent-sessions/session-1/summary') {
+      return json(route, agentSummaryFixture)
+    }
+    if (method === 'GET' && path === '/api/agent-sessions') {
+      return json(route, agentSessionListFixture)
+    }
     if (method === 'GET' && path === '/api/agent-sessions/session-1') {
       return json(route, agentSessionFixture)
     }

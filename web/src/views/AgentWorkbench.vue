@@ -78,6 +78,11 @@
     />
     <div v-else class="agent-workbench">
       <van-notice-bar v-if="actionError" color="#ee0a24" :text="actionError" />
+      <div class="agent-toolbar">
+        <button type="button" class="summary-link pressable" @click="openSummary">
+          查看最终结果汇总
+        </button>
+      </div>
       <div class="agent-layout adaptive-grid adaptive-grid--sidebar adaptive-grid--context">
         <AgentTaskNavigation
           :tasks="session.tasks"
@@ -100,7 +105,7 @@
         <section v-if="latestValidation(task)" class="card"><h3>本轮修改效果验证</h3><p v-if="latestValidation(task).safetyStatus === 'unavailable'">验证暂未完成，系统不会宣称本次修改已有改善。</p><p v-else>{{ outcomeLabel(latestValidation(task).changeOutcome) }} · {{ safetyLabel(latestValidation(task).safetyStatus) }}</p><p class="candidate">{{ latestValidation(task).diff.before }} → {{ latestValidation(task).diff.after }}</p><p v-for="(issue, index) in latestValidation(task).remainingIssues" :key="`${issue.type}-${index}`" class="risk">{{ issue.type }}</p><van-button v-if="latestValidation(task).safetyStatus === 'unavailable'" type="primary" block round :loading="busy" @click="validateSavedEdit">重试验证</van-button><van-button v-if="latestValidation(task).safetyStatus === 'blocked' && task.state !== 'completed_with_risk'" type="warning" block round @click="completeWithRisk">确认保留风险内容</van-button></section>
         <section v-if="task.state === 'user_edited' && !editMode" class="card"><h3>用户编辑，未经验证</h3><p>保存草稿不会触发审核。完成本轮修改后，可主动验证事实风险和表达效果。</p><van-button type="primary" block round :loading="busy" @click="validateSavedEdit">完成修改并验证</van-button><van-button plain block round style="margin-top:8px" @click="editMode=true">继续编辑</van-button></section>
         <section v-if="task.state === 'return_control'" class="card"><h3>自动追问已暂停</h3><p>你可以继续补充、手动编辑或暂时跳过；系统不会强制生成。</p><van-button block round type="primary" @click="returnControl('continue')">继续补充</van-button><van-button block round style="margin-top:8px" @click="editMode=true">自己编辑</van-button><van-button block round style="margin-top:8px" @click="returnControl('skip')">暂时跳过</van-button></section>
-        <section v-if="['accepted','rejected','skipped','ready_for_reevaluation','completed_with_risk'].includes(task.state)" class="card success"><h3>本任务已完成</h3><p v-if="task.state === 'completed_with_risk'">已确认保留风险内容；该文本未标记为“已验证”。</p><p v-else-if="latestValidation(task)?.safetyStatus === 'passed'">当前文本已验证，并已写入最终交接。</p><p v-else>已保留来源、事实引用和审核状态，可继续处理下一项任务。</p><van-button v-if="task.state === 'ready_for_reevaluation'" plain block round @click="startEdit">继续编辑</van-button></section>
+        <section v-if="['accepted','rejected','skipped','ready_for_reevaluation','completed_with_risk'].includes(task.state)" class="card success"><h3>本任务已完成</h3><p v-if="task.state === 'completed_with_risk'">已确认保留风险内容；该文本未标记为“已验证”。</p><p v-else-if="latestValidation(task)?.safetyStatus === 'passed'">当前文本已验证，并已写入最终交接。</p><p v-else>已保留来源、事实引用和审核状态，可继续处理下一项任务。</p><van-button v-if="task.state === 'ready_for_reevaluation'" plain block round @click="startEdit">继续编辑</van-button><van-button plain block round style="margin-top:8px" @click="openSummary">查看最终结果汇总</van-button></section>
         </section>
         <AgentEvidenceContext
           v-if="task"
@@ -227,6 +232,14 @@ function applySession(value) {
   session.value = normalized
   if (selectedId.value && !normalized.tasks.some((item) => item.id === selectedId.value)) {
     selectedId.value = ''
+  }
+  const requestedTaskId = typeof route.query?.task === 'string' ? route.query.task : ''
+  if (
+    !selectedId.value
+    && requestedTaskId
+    && normalized.tasks.some((item) => item.id === requestedTaskId)
+  ) {
+    selectedId.value = requestedTaskId
   }
 
   const id = normalized.id || sessionId.value
@@ -470,6 +483,11 @@ async function run(command) {
   }
 }
 
+function openSummary() {
+  if (!sessionId.value) return
+  router.push(`/agent/${sessionId.value}/summary`)
+}
+
 function select(item) {
   if (busy.value || !item) return
   selectedId.value = item.id
@@ -537,7 +555,7 @@ onBeforeUnmount(() => {
 })
 </script>
 <style scoped>
-.agent-workbench{min-width:0}.agent-layout{margin-top:var(--spacing-lg)}.agent-stage{min-width:0}.card{background:var(--surface-content);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:var(--spacing-lg);margin-bottom:var(--spacing-md);box-shadow:var(--shadow-sm)}h3{font-size:16px;margin:0 0 10px}.candidate{white-space:pre-wrap;line-height:1.7}.risk{color:#9a6700}.success{background:#f0fff4}.minor{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.agent-workbench{min-width:0}.agent-toolbar{display:flex;justify-content:flex-end;margin-top:var(--spacing-md)}.summary-link{min-height:2.75rem;padding:0 1rem;color:var(--color-primary);background:var(--surface-content);border:1px solid var(--border-strong);border-radius:999px;cursor:pointer;font:inherit;font-weight:600}.agent-layout{margin-top:var(--spacing-lg)}.agent-stage{min-width:0}.card{background:var(--surface-content);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:var(--spacing-lg);margin-bottom:var(--spacing-md);box-shadow:var(--shadow-sm)}h3{font-size:16px;margin:0 0 10px}.candidate{white-space:pre-wrap;line-height:1.7}.risk{color:#9a6700}.success{background:#f0fff4}.minor{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 
 @media (min-width:56.25rem){.task-navigation,.evidence-context{position:sticky;top:6rem;max-height:calc(100svh - 7rem);overflow:auto}}
 @media (min-width:56.25rem) and (max-width:74.999rem){.evidence-context{grid-column:2}}

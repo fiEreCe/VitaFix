@@ -148,8 +148,10 @@ export const analysisApi = {
 }
 
 export const agentSessionApi = {
+  list(params = {}) { return request('/agent-sessions', { params }) },
   create(jdId, resumeId) { return request('/agent-sessions', { method: 'POST', data: { jdId, resumeId } }) },
   get(id) { return request(`/agent-sessions/${id}`) },
+  summary(id) { return request(`/agent-sessions/${id}/summary`) },
   start(id) { return request(`/agent-sessions/${id}/start`, { method: 'POST' }) },
   selectTask(id, taskId) { return request(`/agent-sessions/${id}/tasks/${taskId}/select`, { method: 'POST' }) },
   answer(id, taskId, answer) { return request(`/agent-sessions/${id}/tasks/${taskId}/answers`, { method: 'POST', data: { answer } }) },

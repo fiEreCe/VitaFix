@@ -36,6 +36,7 @@ const {
   getStatus,
   getById,
   list,
+  agentList,
   updateName,
   analysisCompleted,
   historyRenamed,
@@ -46,6 +47,7 @@ const {
   getStatus: vi.fn(),
   getById: vi.fn(),
   list: vi.fn(),
+  agentList: vi.fn(),
   updateName: vi.fn(),
   analysisCompleted: vi.fn(),
   historyRenamed: vi.fn(),
@@ -72,6 +74,9 @@ vi.mock('../../src/api', () => ({
     updateName,
     remove: vi.fn(),
   },
+  agentSessionApi: {
+    list: agentList,
+  },
 }))
 
 vi.mock('../../src/utils/analytics', () => ({
@@ -93,7 +98,8 @@ describe('result and history workspaces', () => {
     push.mockReset()
     getStatus.mockReset().mockResolvedValue({ status: 'completed' })
     getById.mockReset().mockResolvedValue({ analysis: fixture, name: '高级产品经理匹配分析' })
-    list.mockReset().mockResolvedValue({ list: [historyItem] })
+    list.mockReset().mockResolvedValue({ list: [historyItem], total: 1 })
+    agentList.mockReset().mockResolvedValue({ list: [], total: 0 })
     updateName.mockReset().mockResolvedValue({})
     historyRenamed.mockReset()
     analysisCompleted.mockReset()
@@ -144,6 +150,16 @@ describe('result and history workspaces', () => {
     expect(dimension.get('button').attributes('aria-expanded')).toBe('false')
   })
 
+  it('opens a legacy Analysis record from history', async () => {
+    const history = mount(History, {
+      global: { mocks: { $router: { back, push } } },
+    })
+    await flushPromises()
+
+    await history.get('button[aria-label="打开分析：高级产品经理匹配分析"]').trigger('click')
+    expect(push).toHaveBeenCalledWith('/result/analysis-1')
+  })
+
   it('gives each destructive history action a record-specific label', async () => {
     const history = mount(History, {
       global: { mocks: { $router: { back, push } } },
@@ -153,6 +169,64 @@ describe('result and history workspaces', () => {
     const deleteButtons = history.findAll('button[aria-label^="删除分析"]')
     expect(deleteButtons.length).toBe(1)
     expect(deleteButtons[0].attributes('aria-label')).toContain(historyItem.name)
+  })
+
+  it('lists Agent sessions beside legacy Analysis records with type-specific actions', async () => {
+    agentList.mockResolvedValue({
+      list: [{
+        id: 'session-1',
+        type: 'agent',
+        title: '示例公司 · 产品经理',
+        company: '示例公司',
+        position: '产品经理',
+        state: 'task_in_progress',
+        taskCount: 3,
+        completedCount: 2,
+        updatedAt: '2026-08-09T00:00:00.000Z',
+      }],
+      total: 1,
+    })
+
+    const history = mount(History, {
+      global: { mocks: { $router: { back, push } } },
+    })
+    await flushPromises()
+
+    expect(agentList).toHaveBeenCalledWith({ page: 1, pageSize: 100 })
+    expect(history.findAll('.history-card')).toHaveLength(2)
+
+    const agentCard = history.get('[aria-label="打开优化会话：示例公司 · 产品经理"]')
+    expect(agentCard.text()).toContain('已完成 2/3 项')
+    expect(agentCard.text()).toContain('处理中')
+    await agentCard.trigger('click')
+    expect(push).toHaveBeenCalledWith('/agent/session-1')
+
+    await history.get('[aria-label="查看优化汇总：示例公司 · 产品经理"]').trigger('click')
+    expect(push).toHaveBeenCalledWith('/agent/session-1/summary')
+
+    // Agent cards do not expose Analysis-only rename/delete actions.
+    expect(history.find('[aria-label^="重命名分析：示例公司"]').exists()).toBe(false)
+    expect(history.find('[aria-label^="删除分析：示例公司"]').exists()).toBe(false)
+    expect(history.find('button[aria-label^="重命名分析"]').exists()).toBe(true)
+  })
+
+  it('shows a retryable error instead of a misleading empty history', async () => {
+    agentList.mockRejectedValue(new Error('network unavailable'))
+
+    const history = mount(History, {
+      global: { mocks: { $router: { back, push } } },
+    })
+    await flushPromises()
+
+    expect(history.text()).toContain('历史记录加载失败')
+    expect(history.text()).toContain('network unavailable')
+
+    agentList.mockResolvedValue({ list: [], total: 0 })
+    await history.get('.status-panel__retry').trigger('click')
+    await flushPromises()
+
+    expect(history.text()).not.toContain('历史记录加载失败')
+    expect(history.text()).toContain('高级产品经理匹配分析')
   })
 
   it('renames a history record once when the dialog confirms', async () => {

@@ -1,63 +1,92 @@
 <template>
   <AppPage
     class="history-page"
-    title="历史分析"
-    description="回看、命名和管理你的岗位匹配记录。"
+    title="历史记录"
+    description="回看、命名和管理岗位匹配分析与证据优化记录。"
     back
     @back="router.back()"
   >
 
-    <StatusPanel v-if="loading" kind="loading" title="正在加载历史分析" />
+    <StatusPanel v-if="loading" kind="loading" title="正在加载历史记录" />
+
+    <StatusPanel
+      v-else-if="error"
+      kind="error"
+      title="历史记录加载失败"
+      :message="error.message || '请检查网络后重试。'"
+      retryable
+      @retry="loadList"
+    />
 
     <StatusPanel
       v-else-if="list.length === 0"
       kind="empty"
-      title="还没有分析记录"
-      message="完成一次岗位匹配分析后，记录会出现在这里。"
+      title="还没有分析或优化记录"
+      message="完成一次岗位匹配分析或证据优化后，记录会出现在这里。"
     />
 
     <div v-else class="list">
-      <div v-for="item in list" :key="item.id" class="history-card">
+      <div v-for="item in list" :key="entityKey(item)" class="history-card">
         <button
           class="history-row__open"
           type="button"
-          :aria-label="`打开分析：${item.name}`"
-          @click="router.push(`/result/${item.id}`)"
+          :aria-label="item.type === 'agent' ? `打开优化会话：${item.title || '简历优化会话'}` : `打开分析：${item.name}`"
+          @click="openItem(item)"
         >
           <div class="card-left">
-            <span class="card-name">{{ item.name }}</span>
+            <span class="card-name">
+              <span class="type-pill">{{ item.type === 'agent' ? '优化会话' : '匹配分析' }}</span>
+              {{ item.type === 'agent' ? (item.title || '简历优化会话') : item.name }}
+            </span>
             <div class="card-meta">
               {{ item.company }}<span v-if="item.company && item.position"> · </span>{{ item.position }}
             </div>
-            <div class="card-time">{{ formatDate(item.createdAt) }}</div>
+            <div class="card-time">{{ formatDate(item.updatedAt || item.createdAt) }}</div>
           </div>
           <div class="card-right">
-            <div class="score-num" :style="{ color: getGradeColor(item.score) }">{{ item.score }}</div>
-            <div class="score-grade" :style="{ color: getGradeColor(item.score) }">{{ item.grade }}</div>
+            <template v-if="item.type === 'agent'">
+              <div class="agent-state">{{ sessionStateLabel(item.state) }}</div>
+              <div class="agent-progress">{{ taskProgress(item).text }}</div>
+            </template>
+            <template v-else>
+              <div class="score-num" :style="{ color: getGradeColor(item.score) }">{{ item.score }}</div>
+              <div class="score-grade" :style="{ color: getGradeColor(item.score) }">{{ item.grade }}</div>
+            </template>
           </div>
         </button>
         <div class="history-row__actions">
           <button
-            class="edit-btn"
+            v-if="item.type === 'agent'"
+            class="summary-btn"
             type="button"
-            :aria-label="`重命名分析：${item.name}`"
-            @click="startEdit(item)"
+            :aria-label="`查看优化汇总：${item.title || '简历优化会话'}`"
+            @click="openSummary(item)"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path d="M10.5 1.5l2 2L4.5 11.5l-2.5.5.5-2.5L10.5 1.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            汇总
+          </button>
+          <template v-else>
+            <button
+              class="edit-btn"
+              type="button"
+              :aria-label="`重命名分析：${item.name}`"
+              @click="startEdit(item)"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M10.5 1.5l2 2L4.5 11.5l-2.5.5.5-2.5L10.5 1.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button
+              class="card-delete"
+              type="button"
+              :aria-label="`删除分析：${item.name}`"
+              @click="confirmDelete(item)"
+            >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 4h10M6 4V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5V4M13 4v9.5a.5.5 0 01-.5.5h-9a.5.5 0 01-.5-.5V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M6.5 7v4M9.5 7v4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
             </svg>
-          </button>
-          <button
-            class="card-delete"
-            type="button"
-            :aria-label="`删除分析：${item.name}`"
-            @click="confirmDelete(item)"
-          >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 4h10M6 4V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5V4M13 4v9.5a.5.5 0 01-.5.5h-9a.5.5 0 01-.5-.5V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M6.5 7v4M9.5 7v4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-          </svg>
-          </button>
+            </button>
+          </template>
         </div>
       </div>
     </div>
@@ -83,8 +112,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
-import { historyApi } from '../api'
+import { agentSessionApi, historyApi } from '../api'
 import { formatDate, getGradeColor } from '../utils/format'
+import {
+  entityKey,
+  sessionStateLabel,
+  sortByRecent,
+  taskProgress,
+} from '../utils/agent'
 import { events } from '../utils/analytics'
 import { useRouter } from 'vue-router'
 import AppPage from '../components/ui/AppPage.vue'
@@ -94,6 +129,7 @@ const router = useRouter()
 
 const list = ref([])
 const loading = ref(true)
+const error = ref(null)
 const showEdit = ref(false)
 const editName = ref('')
 const editingItem = ref(null)
@@ -104,14 +140,28 @@ onMounted(async () => {
 
 async function loadList() {
   loading.value = true
+  error.value = null
   try {
-    const res = await historyApi.list({ page: 1, pageSize: 100 })
-    list.value = res.list || []
+    const [analysisRes, agentRes] = await Promise.all([
+      historyApi.list({ page: 1, pageSize: 100 }),
+      agentSessionApi.list({ page: 1, pageSize: 100 }),
+    ])
+    const analyses = (analysisRes.list || []).map((item) => ({ ...item, type: 'analysis' }))
+    const agents = (agentRes.list || []).map((item) => ({ ...item, type: 'agent' }))
+    list.value = [...analyses, ...agents].sort(sortByRecent)
   } catch (e) {
-    showToast('加载失败: ' + e.message)
+    error.value = e
   } finally {
     loading.value = false
   }
+}
+
+function openItem(item) {
+  router.push(item.type === 'agent' ? `/agent/${item.id}` : `/result/${item.id}`)
+}
+
+function openSummary(item) {
+  router.push(`/agent/${item.id}/summary`)
 }
 
 function startEdit(item) {
@@ -255,6 +305,44 @@ function confirmDelete(item) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.type-pill {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-selected, #eef5ff);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+.agent-state {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.agent-progress {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.summary-btn {
+  flex-shrink: 0;
+  min-width: 52px;
+  min-height: 44px;
+  padding: 10px 8px;
+  color: var(--color-primary);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .card-meta {

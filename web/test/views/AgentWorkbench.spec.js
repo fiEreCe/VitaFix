@@ -13,6 +13,7 @@ import {
 const {
   back,
   replace,
+  push,
   getSession,
   startSession,
   selectTask,
@@ -21,6 +22,7 @@ const {
 } = vi.hoisted(() => ({
   back: vi.fn(),
   replace: vi.fn(),
+  push: vi.fn(),
   getSession: vi.fn(),
   startSession: vi.fn(),
   selectTask: vi.fn(),
@@ -33,7 +35,7 @@ vi.mock('vue-router', async () => {
   const state = reactive(route)
   return {
     useRoute: () => state,
-    useRouter: () => ({ back, replace, push: vi.fn() }),
+    useRouter: () => ({ back, replace, push }),
     __route: state,
   }
 })
@@ -127,12 +129,14 @@ describe('AgentWorkbench adaptive evidence workspace', () => {
   beforeEach(() => {
     back.mockReset()
     replace.mockReset()
+    push.mockReset()
     getSession.mockReset()
     startSession.mockReset()
     selectTask.mockReset()
     decide.mockReset()
     localStorage.clear()
     __route.params.id = 'session-1'
+    __route.query = {}
     getSession.mockResolvedValue(structuredClone(sessionFixture))
   })
 
@@ -189,6 +193,32 @@ describe('AgentWorkbench adaptive evidence workspace', () => {
       requirementId: 'requirement-b',
       factIds: [],
       state: 'questioning',
+    })
+    getSession.mockResolvedValue(restoredSession)
+
+    const wrapper = mountWorkbench()
+    await flushPromises()
+
+    expect(wrapper.get('[aria-current="step"]').text()).toContain('数据分析')
+  })
+
+  it('links to the multi-task result summary', async () => {
+    const wrapper = mountWorkbench()
+    await flushPromises()
+
+    await wrapper.get('.summary-link').trigger('click')
+    expect(push).toHaveBeenCalledWith('/agent/session-1/summary')
+  })
+
+  it('opens the task requested by the summary return link', async () => {
+    __route.query = { task: 'task-b' }
+    const restoredSession = structuredClone(sessionFixture)
+    restoredSession.requirements.push({ id: 'requirement-b', sourceText: '数据分析' })
+    restoredSession.tasks.push({
+      id: 'task-b',
+      requirementId: 'requirement-b',
+      factIds: [],
+      state: 'pending',
     })
     getSession.mockResolvedValue(restoredSession)
 

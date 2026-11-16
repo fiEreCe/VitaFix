@@ -23,4 +23,5 @@ const schema = new mongoose.Schema({
   tasks: [taskSchema], transitions: [transitionSchema], handoff: mongoose.Schema.Types.Mixed,
   expiresAt: { type: Date, default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), expires: 0 },
 }, { timestamps: true });
+schema.index({ userId: 1, updatedAt: -1 });
 module.exports = mongoose.model('AgentSession', schema);

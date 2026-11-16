@@ -118,7 +118,7 @@ describe('input flow semantics', () => {
 
     expect(dropZone.attributes('role')).toBeUndefined()
     expect(dropZone.attributes('tabindex')).toBeUndefined()
-    expect(input.attributes('accept')).toBe('.pdf,.docx,.doc,.txt')
+    expect(input.attributes('accept')).toBe('.pdf,.docx,.txt')
     expect(input.attributes('disabled')).toBeUndefined()
 
     wrapper.vm.uploading = true
