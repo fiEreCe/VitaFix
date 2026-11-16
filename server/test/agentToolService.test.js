@@ -84,7 +84,9 @@ test('resume parsing adds supplement facts and skips duplicate or included items
   assert.match(supplement.sourceText, /数据分析实习/);
   assert.match(supplement.sourceText, /2024\.06-2024\.09/);
   assert.match(supplement.sourceText, /使用SQL分析用户行为/);
-  assert.equal(supplement.confirmation, 'confirmed');
+  assert.equal(supplement.confirmation, 'pending_confirmation');
+  assert.equal(supplement.confirmationSource, 'auto');
+  assert.equal(facts[0].confirmation, 'pending_confirmation');
 
   const matched = await service.matchEvidence({
     requirements: [{ id: 'r1', sourceText: '熟练使用SQL进行数据分析', priority: 10 }],

@@ -283,6 +283,26 @@ test('legacy sessions missing currentText, validationRecords, factIds, and hando
   assert.equal(summary.tasks[1].verificationStatus, 'passed');
 });
 
+test('legacy confirmed facts without a recorded source are marked legacy instead of user-confirmed', () => {
+  const summary = buildSessionSummary(session({
+    resumeFacts: [
+      fact('fact-1', '设计访谈提纲并访谈 8 位用户'),
+      { id: 'fact-2', sourceText: '用户本次确认的事实', confirmation: 'confirmed', confirmationSource: 'user' },
+      { id: 'fact-3', sourceText: '待确认事实', confirmation: 'pending_confirmation', confirmationSource: 'auto' },
+    ],
+    tasks: [task({ factIds: ['fact-1', 'fact-2', 'fact-3'] })],
+  }));
+
+  assert.deepEqual(
+    summary.tasks[0].facts.map(({ id, confirmation, confirmationSource }) => ({ id, confirmation, confirmationSource })),
+    [
+      { id: 'fact-1', confirmation: 'confirmed', confirmationSource: 'legacy' },
+      { id: 'fact-2', confirmation: 'confirmed', confirmationSource: 'user' },
+      { id: 'fact-3', confirmation: 'pending_confirmation', confirmationSource: 'auto' },
+    ],
+  );
+});
+
 test('list item uses structured JD fields, task progress, and safe defaults', () => {
   const item = buildSessionListItem({
     _id: { toString: () => 'session-1' },

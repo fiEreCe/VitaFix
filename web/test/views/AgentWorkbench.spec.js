@@ -18,6 +18,7 @@ const {
   startSession,
   selectTask,
   decide,
+  reviewFact,
   route,
 } = vi.hoisted(() => ({
   back: vi.fn(),
@@ -27,6 +28,7 @@ const {
   startSession: vi.fn(),
   selectTask: vi.fn(),
   decide: vi.fn(),
+  reviewFact: vi.fn(),
   route: { params: { id: 'session-1' }, query: {} },
 }))
 
@@ -46,7 +48,7 @@ vi.mock('../../src/api', () => ({
     start: startSession,
     selectTask,
     answer: vi.fn(),
-    reviewFact: vi.fn(),
+    reviewFact,
     generate: vi.fn(),
     retry: vi.fn(),
     validate: vi.fn(),
@@ -134,6 +136,7 @@ describe('AgentWorkbench adaptive evidence workspace', () => {
     startSession.mockReset()
     selectTask.mockReset()
     decide.mockReset()
+    reviewFact.mockReset()
     localStorage.clear()
     __route.params.id = 'session-1'
     __route.query = {}
@@ -532,6 +535,131 @@ describe('AgentWorkbench adaptive evidence workspace', () => {
     expect(wrapper.text()).not.toContain('负责用户研究并形成洞察')
 
     wrapper.unmount()
+  })
+
+  it('shows structured pending facts with confirm, correction, and reject entry points', async () => {
+    const pendingSession = {
+      id: 'session-1',
+      state: 'task_in_progress',
+      requirements: [{ id: 'requirement-1', sourceText: '负责用户研究并形成洞察' }],
+      resumeFacts: [{
+        id: 'fact-1',
+        sourceText: '参与校园用户访谈',
+        action: '参与用户访谈',
+        context: '校园产品',
+        contribution: '团队共同完成',
+        method: '半结构化访谈',
+        result: '输出用户洞察',
+        quantity: '8',
+        confirmation: 'pending_confirmation',
+        confirmationSource: 'auto',
+      }],
+      tasks: [{
+        id: 'task-1',
+        requirementId: 'requirement-1',
+        factIds: ['fact-1'],
+        recommended: true,
+        state: 'awaiting_fact_confirmation',
+        pendingFactId: 'fact-1',
+        effectiveRounds: 0,
+      }],
+    }
+    getSession.mockResolvedValue(pendingSession)
+    reviewFact.mockResolvedValue(pendingSession)
+
+    const wrapper = mountWorkbench()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('请核对将进入候选审核的事实')
+    expect(wrapper.text()).toContain('个人行动')
+    expect(wrapper.text()).toContain('参与用户访谈')
+    expect(wrapper.text()).toContain('半结构化访谈')
+    expect(wrapper.text()).toContain('输出用户洞察')
+    expect(wrapper.text()).toContain('8')
+
+    const confirm = wrapper.findAll('van-button').find((button) => button.text().includes('确认无误'))
+    expect(confirm).toBeTruthy()
+    await confirm.trigger('click')
+    await flushPromises()
+
+    expect(reviewFact).toHaveBeenCalledWith('session-1', 'task-1', 'fact-1', 'confirm')
+    expect(wrapper.findAll('van-button').some((button) => button.text().includes('修正内容'))).toBe(true)
+    expect(wrapper.findAll('van-button').some((button) => button.text().includes('不是这个意思'))).toBe(true)
+  })
+
+  it('sends only changed structured fields when the user corrects a pending fact', async () => {
+    const pendingSession = {
+      id: 'session-1',
+      state: 'task_in_progress',
+      requirements: [{ id: 'requirement-1', sourceText: '负责用户研究并形成洞察' }],
+      resumeFacts: [{
+        id: 'fact-1',
+        sourceText: '参与校园用户访谈',
+        action: '参与用户访谈',
+        context: '校园产品',
+        contribution: '团队共同完成',
+        confirmation: 'pending_confirmation',
+        confirmationSource: 'auto',
+      }],
+      tasks: [{
+        id: 'task-1',
+        requirementId: 'requirement-1',
+        factIds: ['fact-1'],
+        recommended: true,
+        state: 'awaiting_fact_confirmation',
+        pendingFactId: 'fact-1',
+        effectiveRounds: 0,
+      }],
+    }
+    getSession.mockResolvedValue(pendingSession)
+    reviewFact.mockResolvedValue(pendingSession)
+
+    const wrapper = mountWorkbench()
+    await flushPromises()
+
+    const startCorrection = wrapper.findAll('van-button')
+      .find((button) => button.text().includes('修正内容'))
+    await startCorrection.trigger('click')
+    await flushPromises()
+
+    const actionField = wrapper.findAll('textarea')[0]
+    expect(actionField.exists()).toBe(true)
+    await actionField.setValue('独立设计访谈提纲并访谈 8 位用户')
+
+    const saveCorrection = wrapper.findAll('van-button')
+      .find((button) => button.text().includes('保存修正并确认'))
+    await saveCorrection.trigger('click')
+    await flushPromises()
+
+    expect(reviewFact).toHaveBeenCalledWith(
+      'session-1',
+      'task-1',
+      'fact-1',
+      'correct',
+      { action: '独立设计访谈提纲并访谈 8 位用户' },
+    )
+  })
+
+  it('labels legacy confirmed facts as historical instead of user-confirmed', async () => {
+    getSession.mockResolvedValue({
+      ...structuredClone(sessionFixture),
+      state: 'task_in_progress',
+      resumeFacts: [
+        { id: 'fact-1', sourceText: '设计访谈提纲并访谈 8 位用户', confirmation: 'confirmed' },
+        { id: 'fact-2', sourceText: '用户确认过的事实', confirmation: 'confirmed', confirmationSource: 'user' },
+      ],
+      tasks: [{
+        ...structuredClone(sessionFixture.tasks[0]),
+        factIds: ['fact-1', 'fact-2'],
+        state: 'verification_failed',
+      }],
+    })
+
+    const wrapper = mountWorkbench()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('历史确认（未记录用户操作）')
+    expect(wrapper.text()).toContain('用户已确认')
   })
 
   it('stops polling after the page is unmounted', async () => {

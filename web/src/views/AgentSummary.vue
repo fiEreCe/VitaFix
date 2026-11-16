@@ -180,7 +180,7 @@
               <li v-for="fact in task.facts" :key="fact.id">
                 <span class="fact-id">{{ fact.id }}</span>
                 <span class="fact-text">{{ fact.sourceText }}</span>
-                <span class="fact-confirmation">{{ factConfirmationLabel(fact.confirmation) }}</span>
+                <span class="fact-confirmation">{{ factConfirmationLabel(fact) }}</span>
               </li>
             </ul>
             <p v-else class="muted">暂无事实引用。</p>
@@ -280,13 +280,16 @@ function verificationTone(status) {
   return 'warning'
 }
 
-function factConfirmationLabel(value) {
+function factConfirmationLabel(fact) {
+  const value = fact?.confirmation || ''
+  // 旧会话缺少确认来源时按“历史记录”展示，不能冒充用户已确认。
+  const legacy = fact?.confirmationSource !== 'user'
+  if (value === 'confirmed') return legacy ? '历史确认（未记录用户操作）' : '用户已确认'
+  if (value === 'corrected') return legacy ? '历史修正（未记录用户操作）' : '用户已修正'
   return ({
-    confirmed: '已确认',
-    corrected: '已修正',
     pending_confirmation: '待确认',
     rejected: '已拒绝',
-    extracted: '自动提取',
+    extracted: '待确认',
   })[value] || ''
 }
 

@@ -138,7 +138,8 @@ test('a saved supplement reaches the frozen snapshot, parsing, and evidence matc
   const supplementFact = started.body.resumeFacts.find((fact) => fact.source === 'supplement');
   assert.ok(supplementFact);
   assert.match(supplementFact.sourceText, /用户访谈/);
-  assert.equal(supplementFact.confirmation, 'confirmed');
+  assert.equal(supplementFact.confirmation, 'pending_confirmation');
+  assert.equal(supplementFact.confirmationSource, 'auto');
   assert.ok(started.body.matches[0].factIds.includes(supplementFact.id));
   assert.ok(started.body.tasks[0].factIds.includes(supplementFact.id));
 });

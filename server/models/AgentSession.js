@@ -4,6 +4,12 @@ const { SESSION_STATES, TASK_STATES, FACT_CONFIRMATIONS } = require('../domain/a
 const factSchema = new mongoose.Schema({
   id: String, sourceText: String, action: String, context: String, contribution: String,
   method: String, result: String, quantity: String, quantityType: { type: String, enum: ['exact', 'estimated', 'unconfirmed'] }, confirmation: { type: String, enum: FACT_CONFIRMATIONS },
+  // 用户确认来源：新会话显式记录；历史会话缺少该字段时按“来源未记录”展示，不做批量改写。
+  confirmationSource: { type: String, enum: ['auto', 'user'] },
+  // 补充/追问事实基于哪条已有事实生成，用于确认时做任务局部替换。
+  baseFactId: String,
+  // 修正后事实指向的原事实，原事实记录保持不变。
+  originalFactId: String,
   source: { type: String, enum: ['resume', 'supplement'] },
 }, { _id: false });
 const taskSchema = new mongoose.Schema({

@@ -31,7 +31,7 @@ test('normalizes the Supplement schema fields and drops unusable items', () => {
   }]);
 });
 
-test('builds confirmed supplement evidence with title, period, and description', () => {
+test('builds pending supplement evidence with title, period, and description', () => {
   const facts = buildSupplementFacts([{
     type: '项目',
     title: '数据分析项目',
@@ -49,7 +49,8 @@ test('builds confirmed supplement evidence with title, period, and description',
     method: '',
     result: '',
     quantity: '',
-    confirmation: 'confirmed',
+    confirmation: 'pending_confirmation',
+    confirmationSource: 'auto',
     source: 'supplement',
   }]);
 });

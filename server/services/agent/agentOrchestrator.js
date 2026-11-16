@@ -119,6 +119,14 @@ class AgentOrchestrator {
   async selectTask(id, userId, taskId) {
     const session = await this._get(id, userId); const task = this._task(session, taskId);
     session.currentTaskId = taskId;
+    // 未确认事实必须先经过用户核对，不能被“开始处理”直接带过。
+    const pendingFacts = this._pendingFactsForTask(session, task);
+    if (pendingFacts.length) {
+      this._enterFactReview(task, pendingFacts[0]);
+      this._transition(session, task, 'awaiting_fact_confirmation', 'TASK_SELECTED');
+      this._transition(session, null, 'task_in_progress', 'TASK_SELECTED');
+      return this.repository.save(session, userId);
+    }
     const facts = this._confirmedFactsForTask(session, task);
     task.sufficiency = facts.length ? calculateSufficiency(mergeFacts(facts)) : 'insufficient';
     if (task.sufficiency === 'insufficient') {
@@ -132,6 +140,12 @@ class AgentOrchestrator {
 
   async generateCandidate(id, userId, taskId) {
     const session = await this._get(id, userId); const task = this._task(session, taskId);
+    const pendingFacts = this._pendingFactsForTask(session, task);
+    if (pendingFacts.length) {
+      this._enterFactReview(task, pendingFacts[0]);
+      this._transition(session, task, 'awaiting_fact_confirmation', 'FACT_CONFIRMATION_REQUIRED');
+      return this.repository.save(session, userId);
+    }
     const facts = this._confirmedFactsForTask(session, task);
     task.sufficiency = facts.length ? calculateSufficiency(mergeFacts(facts)) : 'insufficient';
     if (task.sufficiency === 'insufficient') {
@@ -252,12 +266,14 @@ class AgentOrchestrator {
     const baseFact = confirmedFacts.at(-1);
     const merged = { ...mergeFacts(confirmedFacts), ...this._nonEmptyPatch(assessment.factPatch) };
     const fact = {
-      id: `fact-${session.resumeFacts.length + 1}`,
+      id: this._nextFactId(session),
       sourceText: [baseFact?.sourceText, answer].filter(Boolean).join('\n'),
       action: '', context: '', contribution: '', method: '', result: '', quantity: '',
       quantityType: 'exact',
       ...merged,
       confirmation: 'pending_confirmation',
+      confirmationSource: 'auto',
+      baseFactId: baseFact?.id || '',
     };
     session.resumeFacts.push(fact);
     task.factIds.push(fact.id);
@@ -270,17 +286,60 @@ class AgentOrchestrator {
   async reviewFact(id, userId, taskId, factId, decision, factPatch = {}) {
     const session = await this._get(id, userId); const task = this._task(session, taskId); const fact = session.resumeFacts.find((item) => item.id === factId);
     if (!fact) throw new Error('AGENT_FACT_NOT_FOUND');
-    if (decision === 'correct') Object.assign(fact, factPatch, { confirmation: 'corrected' });
-    else if (decision === 'confirm') fact.confirmation = 'confirmed';
-    else if (decision === 'reject') fact.confirmation = 'rejected';
-    else throw new Error('INVALID_FACT_DECISION');
+    if (!task.factIds.includes(fact.id)) throw new Error('AGENT_FACT_NOT_REFERENCED');
+    if (!['confirm', 'correct', 'reject'].includes(decision)) throw new Error('INVALID_FACT_DECISION');
 
-    if (decision === 'reject') {
-      task.factIds = task.factIds.filter((id) => id !== fact.id);
-    } else if (task.pendingBaseFactId) {
-      const baseFact = session.resumeFacts.find((item) => item.id === task.pendingBaseFactId);
-      if (baseFact) baseFact.confirmation = 'rejected';
-      task.factIds = task.factIds.filter((id) => id !== task.pendingBaseFactId);
+    const awaitingReview = ['extracted', 'pending_confirmation'].includes(fact.confirmation);
+    if (decision !== 'correct' && !awaitingReview) throw new Error('AGENT_FACT_NOT_REVIEWABLE');
+    if (decision === 'correct' && fact.confirmation === 'rejected') throw new Error('AGENT_FACT_NOT_REVIEWABLE');
+
+    // 只有“当前任务的待确认补充事实”在确认后需要局部替换原事实引用。
+    // 该替换只作用于本任务，不会把全局原事实标记为 rejected。
+    const baseFactId = fact.id === task.pendingFactId
+      ? (task.pendingBaseFactId || fact.baseFactId || '')
+      : '';
+    const replacesBase = Boolean(baseFactId) && baseFactId !== fact.id;
+
+    if (decision === 'confirm') {
+      fact.confirmation = 'confirmed';
+      fact.confirmationSource = 'user';
+      if (replacesBase) task.factIds = task.factIds.filter((item) => item !== baseFactId);
+    } else if (decision === 'reject') {
+      // 用户否认这条事实：仅这条事实失效，仍然有效的原事实继续留在本任务中。
+      fact.confirmation = 'rejected';
+      fact.confirmationSource = 'user';
+      task.factIds = task.factIds.filter((item) => item !== fact.id);
+    } else {
+      const patch = this._factPatch(factPatch);
+      if (!Object.keys(patch).length) throw new Error('FACT_CORRECTION_REQUIRED');
+      // 保留原事实记录，新增一条 corrected 版本，只替换当前任务的引用。
+      const corrected = {
+        sourceText: fact.sourceText || '',
+        action: fact.action || '',
+        context: fact.context || '',
+        contribution: fact.contribution || '',
+        method: fact.method || '',
+        result: fact.result || '',
+        quantity: fact.quantity || '',
+        ...(fact.quantityType ? { quantityType: fact.quantityType } : {}),
+        ...patch,
+        id: this._nextFactId(session),
+        confirmation: 'corrected',
+        confirmationSource: 'user',
+        source: fact.source || 'resume',
+        originalFactId: fact.id,
+      };
+      session.resumeFacts.push(corrected);
+      task.factIds = task.factIds.map((item) => (item === fact.id ? corrected.id : item));
+      if (replacesBase) task.factIds = task.factIds.filter((item) => item !== baseFactId);
+    }
+
+    const remainingPending = this._pendingFactsForTask(session, task);
+    if (remainingPending.length) {
+      // 同一任务还有待核对事实时保持确认入口，不提前进入生成或追问。
+      this._enterFactReview(task, remainingPending[0]);
+      this._transition(session, task, 'awaiting_fact_confirmation', 'FACT_REVIEWED');
+      return this.repository.save(session, userId);
     }
 
     task.pendingFactId = '';
@@ -289,18 +348,17 @@ class AgentOrchestrator {
     task.sufficiency = confirmedFacts.length
       ? calculateSufficiency(mergeFacts(confirmedFacts))
       : 'insufficient';
-    const action = decision === 'reject'
-      ? 'question'
-      : nextInsufficientAction({
-        effectiveRounds: task.effectiveRounds,
-        sufficiency: task.sufficiency,
-      });
+    const action = nextInsufficientAction({
+      effectiveRounds: task.effectiveRounds,
+      sufficiency: task.sufficiency,
+    });
     const nextState = action === 'generate'
       ? 'generating'
       : action === 'return_control' ? 'return_control' : 'questioning';
     if (task.sufficiency !== 'insufficient') task.gapType = 'expression';
     if (nextState === 'questioning') {
       task.currentQuestion = this._nextQuestion(task.lastAnswerAssessment);
+      task.questionTarget = task.questionTarget || 'action';
     } else if (nextState === 'generating') {
       task.currentQuestion = '';
       task.questionTarget = '';
@@ -315,7 +373,8 @@ class AgentOrchestrator {
     if (decision.type === 'user_edited') {
       const originalText = this._factsForTask(session, task).map((fact) => fact.sourceText).join('\n');
       const previousText = task.currentText || task.candidate?.text || originalText;
-      const inspection = inspectUserEdit(decision.text, this._factsForTask(session, task));
+      // 用户编辑内容的安全检查只能引用已确认事实，未确认/已拒绝事实不能为其背书。
+      const inspection = inspectUserEdit(decision.text, this._confirmedFactsForTask(session, task));
       task.initialText = task.initialText || originalText;
       task.validationBaseline = previousText;
       task.currentText = decision.text;
@@ -333,6 +392,7 @@ class AgentOrchestrator {
       nextState = 'user_edited';
     } else {
       if (!['accepted', 'rejected', 'skipped'].includes(decision.type)) throw new Error('INVALID_DECISION');
+      if (decision.type === 'accepted' && this._pendingFactsForTask(session, task).length) throw new Error('FACT_CONFIRMATION_REQUIRED');
       if (decision.type === 'accepted' && (task.state !== 'awaiting_user_decision' || !['passed', 'warning'].includes(task.candidate?.verification?.status))) throw new Error('CANDIDATE_NOT_ADOPTABLE');
       nextState = decision.type;
     }
@@ -458,10 +518,38 @@ class AgentOrchestrator {
 
   async _get(id, userId) { const value = await this.repository.get(id, userId); if (!value) throw new Error('AGENT_SESSION_NOT_FOUND'); return value; }
   _task(session, id) { const task = session.tasks.find((item) => item.id === id); if (!task) throw new Error('AGENT_TASK_NOT_FOUND'); return task; }
-  _factsForTask(session, task) { return session.resumeFacts.filter((fact) => task.factIds.includes(fact.id)); }
+  _factsForTask(session, task) {
+    return session.resumeFacts.filter(
+      (fact) => task.factIds.includes(fact.id) && fact.confirmation !== 'rejected',
+    );
+  }
+  _pendingFactsForTask(session, task) {
+    return this._factsForTask(session, task)
+      .filter((fact) => ['extracted', 'pending_confirmation'].includes(fact.confirmation));
+  }
   _confirmedFactsForTask(session, task) {
     return this._factsForTask(session, task)
       .filter((fact) => ['confirmed', 'corrected'].includes(fact.confirmation));
+  }
+  _enterFactReview(task, fact) {
+    task.pendingFactId = fact?.id || '';
+    task.pendingBaseFactId = fact?.baseFactId || '';
+  }
+  _nextFactId(session) {
+    const used = new Set(session.resumeFacts.map((fact) => fact.id));
+    let index = session.resumeFacts.length + 1;
+    while (used.has(`fact-${index}`)) index += 1;
+    return `fact-${index}`;
+  }
+  _factPatch(value = {}) {
+    const allowed = ['sourceText', 'action', 'context', 'contribution', 'method', 'result', 'quantity', 'quantityType'];
+    const patch = Object.fromEntries(
+      Object.entries(this._nonEmptyPatch(value)).filter(([key]) => allowed.includes(key)),
+    );
+    if (patch.quantityType && !['exact', 'estimated', 'unconfirmed'].includes(patch.quantityType)) {
+      delete patch.quantityType;
+    }
+    return patch;
   }
   _fallbackQuestion() {
     return '请补充你本人具体做了什么、服务对象，以及使用的方法或产出。';

@@ -26,7 +26,7 @@ function normalizeSupplementItems(items) {
  * 把补充经历转换为与简历事实同构的证据。
  * - includedInResume=true 表示该经历已在简历正文中，跳过以避免重复计算。
  * - 与简历正文或已解析简历事实重复的条目同样跳过。
- * - 返回的事实继续使用已有事实确认与审核规则（confirmation=confirmed）。
+ * - 补充经历也是自动提取的结构化事实，先进入待确认状态，由用户核对后才可用于生成。
  */
 function buildSupplementFacts(supplements, { resumeText = '', resumeFacts = [], startIndex = 0 } = {}) {
   const resumeCorpus = normalizeText([
@@ -74,7 +74,8 @@ function buildSupplementFacts(supplements, { resumeText = '', resumeFacts = [], 
       method: '',
       result: '',
       quantity: '',
-      confirmation: 'confirmed',
+      confirmation: 'pending_confirmation',
+      confirmationSource: 'auto',
       source: 'supplement',
     });
   }

@@ -92,11 +92,54 @@
           @select="select"
         />
         <section class="agent-stage" aria-label="当前优化任务">
-        <section class="card"><h3>岗位依据</h3><p>{{ requirement(task).sourceText }}</p><h3>可用事实</h3><p v-for="fact in facts(task)" :key="fact.id">{{ fact.sourceText }}</p></section>
+        <section class="card"><h3>岗位依据</h3><p>{{ requirement(task).sourceText }}</p><h3>可用事实</h3><ul v-if="facts(task).length" class="fact-summary"><li v-for="fact in facts(task)" :key="fact.id"><span>{{ fact.sourceText }}</span><span class="fact-summary__status">{{ factStatusLabel(fact) }}</span></li></ul><p v-else>当前任务尚未引用事实。</p></section>
         <section v-if="task.state === 'pending'" class="card"><h3>这项岗位要求可以开始处理</h3><p>系统已整理岗位依据和可用事实。开始后，你可以补充事实、优化表达，或选择跳过。</p><van-button type="primary" block round :loading="busy" @click="startTask">开始处理</van-button></section>
         <section v-if="task.state === 'capability_gap'" class="card"><h3>当前经历缺少这项证据</h3><p>系统没有找到可以支持“{{ requirement(task).sourceText }}”的真实经历，也不会替你虚构事实。</p><p>你可以跳过当前任务，或从左侧选择其他任务继续。</p><van-button type="primary" block round :loading="busy" @click="skipTask">跳过这个任务</van-button><van-button plain block round style="margin-top:8px" :disabled="!hasOtherTask" @click="selectNextTask">处理其他任务</van-button></section>
         <section v-if="task.state === 'questioning'" class="card"><h3>补充一个关键事实（{{ task.effectiveRounds }}/3）</h3><p>{{ task.currentQuestion || '请补充你本人具体做了什么、服务对象，以及使用的方法或产出。' }}</p><van-field v-model="answer" rows="3" autosize type="textarea" placeholder="例如：我设计访谈提纲并整理了用户洞察" /><van-button type="primary" block round :loading="busy" @click="submitAnswer">提交并确认事实</van-button><div class="minor"><van-button size="small" @click="specialAnswer('不记得')">不记得</van-button><van-button size="small" @click="specialAnswer('没有做过')">没有做过</van-button><van-button size="small" @click="specialAnswer('无法证明')">无法证明</van-button></div></section>
-        <section v-if="task.state === 'awaiting_fact_confirmation'" class="card"><h3>请确认提取的事实</h3><p>{{ pendingFact(task)?.sourceText }}</p><van-button type="primary" block round :loading="busy" @click="reviewFact('confirm')">确认无误</van-button><van-button plain block round style="margin-top:8px" @click="reviewFact('reject')">不是这个意思</van-button></section>
+        <section v-if="task.state === 'awaiting_fact_confirmation'" class="card">
+          <h3>请核对将进入候选审核的事实</h3>
+          <template v-if="pendingFact(task)">
+          <p v-if="pendingFactCount(task) > 1" class="fact-review__progress">第 {{ pendingFactIndex(task) }} / {{ pendingFactCount(task) }} 条待确认</p>
+          <p class="fact-review__source">{{ pendingFact(task)?.sourceText }}</p>
+          <dl v-if="pendingFactFields(task).length" class="fact-fields">
+            <template v-for="field in pendingFactFields(task)" :key="field.key">
+              <dt>{{ field.label }}</dt>
+              <dd>{{ field.value }}</dd>
+            </template>
+          </dl>
+          <p v-else class="muted">系统没有提取到结构化字段，请通过“修正内容”补充，或直接确认原始描述。</p>
+
+          <template v-if="!correctingFact">
+            <van-button type="primary" block round :loading="busy" @click="reviewFact('confirm')">确认无误</van-button>
+            <van-button plain block round style="margin-top:8px" :disabled="busy" @click="startCorrection">修正内容</van-button>
+            <van-button plain block round style="margin-top:8px" :loading="busy" @click="reviewFact('reject')">不是这个意思</van-button>
+          </template>
+          <template v-else>
+            <label v-for="field in FACT_FIELDS" :key="field.key" class="fact-correction__field">
+              <span>{{ field.label }}</span>
+              <textarea
+                v-if="field.key !== 'quantity'"
+                v-model="correction[field.key]"
+                rows="2"
+                :placeholder="field.placeholder"
+              ></textarea>
+              <input
+                v-else
+                v-model="correction[field.key]"
+                type="text"
+                :placeholder="field.placeholder"
+              />
+            </label>
+            <p v-if="correctionError" class="risk">{{ correctionError }}</p>
+            <van-button type="primary" block round style="margin-top:8px" :loading="busy" @click="submitCorrection">保存修正并确认</van-button>
+            <van-button plain block round style="margin-top:8px" :disabled="busy" @click="cancelCorrection">取消修正</van-button>
+          </template>
+          </template>
+          <template v-else>
+            <p class="muted">待确认事实已处理或不再可用。</p>
+            <van-button type="primary" block round :loading="busy" @click="resumeTask">继续处理</van-button>
+          </template>
+        </section>
         <section v-if="task.state === 'generating' || task.state === 'assessing_evidence'" class="card"><van-button type="primary" block round :loading="busy" @click="generate">生成候选表达</van-button></section>
         <section v-if="task.candidate" class="card"><h3>候选表达</h3><p class="candidate">{{ task.candidate.text }}</p><van-tag :type="verificationTag(task.candidate.verification.status)">{{ verificationLabel(task.candidate.verification.status) }}</van-tag><p v-if="task.candidate.verification.findings?.length" class="risk">{{ verificationHint(task.candidate.verification.status) }}</p><p>{{ task.candidate.rationaleSummary }}</p><template v-if="task.state === 'awaiting_user_decision'"><van-button type="primary" block round :loading="busy" @click="decide('accepted')">采用这条表达</van-button><van-button plain block round style="margin-top:8px" @click="editMode=true">编辑后采用</van-button><van-button plain block round style="margin-top:8px" @click="decide('rejected')">拒绝并保留原文</van-button></template></section>
         <section v-if="task.state === 'question_failed'" class="card"><h3>回答暂未完成分析</h3><p>你的原回答和已确认事实均已保留，可以直接重试。</p><p v-if="task.pendingAnswer" class="candidate">{{ task.pendingAnswer }}</p><van-button type="primary" block round :loading="busy" @click="retry">重试分析回答</van-button></section>
@@ -152,6 +195,16 @@ const answer = ref('')
 const editMode = ref(false)
 const editedText = ref('')
 const recoveryHint = ref(null)
+const correctingFact = ref(false)
+const correctionError = ref('')
+const correction = ref({
+  action: '',
+  context: '',
+  contribution: '',
+  method: '',
+  result: '',
+  quantity: '',
+})
 
 let mounted = false
 let generation = 0
@@ -191,10 +244,75 @@ const hasOtherTask = computed(() => (session.value?.tasks ?? []).some(
     && !['accepted', 'rejected', 'skipped', 'completed_with_risk'].includes(item.state),
 ))
 
+const FACT_FIELDS = [
+  { key: 'action', label: '个人行动', placeholder: '你本人具体做了什么' },
+  { key: 'context', label: '场景 / 对象', placeholder: '服务什么场景或对象' },
+  { key: 'contribution', label: '个人贡献', placeholder: '其中由你本人负责的部分' },
+  { key: 'method', label: '方法', placeholder: '使用了什么方法' },
+  { key: 'result', label: '结果', placeholder: '形成了什么结果或产出' },
+  { key: 'quantity', label: '数字', placeholder: '例如 8 位、20%' },
+]
+
 const requirement = (item) => session.value?.requirements?.find((entry) => entry.id === item.requirementId) || { sourceText: '岗位要求' }
-const facts = (item) => (session.value?.resumeFacts ?? []).filter((fact) => item.factIds?.includes(fact.id))
-const pendingFact = (item) => session.value?.resumeFacts?.find((fact) => fact.id === item.pendingFactId)
+const facts = (item) => (session.value?.resumeFacts ?? []).filter(
+  (fact) => item.factIds?.includes(fact.id) && fact.confirmation !== 'rejected',
+)
+const pendingFacts = (item) => facts(item).filter(
+  (fact) => ['extracted', 'pending_confirmation'].includes(fact.confirmation),
+)
+const pendingFact = (item) => {
+  const referenced = session.value?.resumeFacts?.find((fact) => fact.id === item.pendingFactId)
+  return referenced && item.factIds?.includes(referenced.id) ? referenced : pendingFacts(item)[0]
+}
+const pendingFactCount = (item) => pendingFacts(item).length
+const pendingFactIndex = (item) => {
+  const fact = pendingFact(item)
+  return Math.max(1, pendingFacts(item).findIndex((entry) => entry.id === fact?.id) + 1)
+}
+const pendingFactFields = (item) => {
+  const fact = pendingFact(item)
+  return FACT_FIELDS
+    .map((field) => ({ ...field, value: fact?.[field.key] }))
+    .filter((field) => typeof field.value === 'string' && field.value.trim())
+}
 const latestValidation = (item) => item.validationRecords?.at(-1)
+
+function factStatusLabel(fact) {
+  if (!fact) return ''
+  if (fact.confirmation === 'confirmed') {
+    if (fact.confirmationSource === 'user') return '用户已确认'
+    // 历史会话没有记录确认来源，不能显示为“用户已确认”。
+    return '历史确认（未记录用户操作）'
+  }
+  if (fact.confirmation === 'corrected') {
+    return fact.confirmationSource === 'user' ? '用户已修正' : '历史修正（未记录用户操作）'
+  }
+  return ({
+    pending_confirmation: '待你确认',
+    extracted: '待你确认',
+    rejected: '已拒绝',
+  })[fact.confirmation] || ''
+}
+
+function resetCorrection() {
+  correctingFact.value = false
+  correctionError.value = ''
+  correction.value = { action: '', context: '', contribution: '', method: '', result: '', quantity: '' }
+}
+
+function startCorrection() {
+  const fact = pendingFact(task.value)
+  if (!fact) return
+  correctionError.value = ''
+  correction.value = Object.fromEntries(
+    FACT_FIELDS.map((field) => [field.key, fact[field.key] || '']),
+  )
+  correctingFact.value = true
+}
+
+function cancelCorrection() {
+  resetCorrection()
+}
 
 function isCurrent(id, token) {
   return token === generation && sessionId.value === id
@@ -270,6 +388,7 @@ function resetForSession() {
   recoveryHint.value = null
   busy.value = false
   starting.value = false
+  resetCorrection()
 }
 
 function rememberRecoveryHint(id) {
@@ -490,12 +609,18 @@ function openSummary() {
 
 function select(item) {
   if (busy.value || !item) return
+  resetCorrection()
   selectedId.value = item.id
   if (item.state === 'pending') run((id) => agentSessionApi.selectTask(id, item.id))
 }
 
 function startTask() {
   if (task.value) select(task.value)
+}
+
+function resumeTask() {
+  if (!task.value) return
+  run((id) => agentSessionApi.selectTask(id, task.value.id))
 }
 
 function skipTask() {
@@ -522,7 +647,32 @@ function submitAnswer() {
   })
 }
 function specialAnswer(value) { run((id) => agentSessionApi.answer(id, task.value.id, value)) }
-function reviewFact(decision) { const fact = pendingFact(task.value); if (fact) run((id) => agentSessionApi.reviewFact(id, task.value.id, fact.id, decision)) }
+function reviewFact(decision) {
+  const fact = pendingFact(task.value)
+  if (!fact) return
+  run(async (id) => {
+    await agentSessionApi.reviewFact(id, task.value.id, fact.id, decision)
+    resetCorrection()
+  })
+}
+
+function submitCorrection() {
+  const fact = pendingFact(task.value)
+  if (!fact) return
+  const patch = {}
+  FACT_FIELDS.forEach((field) => {
+    const value = (correction.value[field.key] || '').trim()
+    if (value && value !== (fact[field.key] || '')) patch[field.key] = value
+  })
+  if (!Object.keys(patch).length) {
+    correctionError.value = '请至少修改一项内容；如果内容无误，请直接确认。'
+    return
+  }
+  run(async (id) => {
+    await agentSessionApi.reviewFact(id, task.value.id, fact.id, 'correct', patch)
+    resetCorrection()
+  })
+}
 function returnControl(action) { run((id) => agentSessionApi.returnControl(id, task.value.id, action)) }
 function saveEdit() { if (editedText.value.trim()) run(async (id) => { await agentSessionApi.decide(id, task.value.id, { type: 'user_edited', text: editedText.value, riskAcknowledged: true }); editMode.value = false }) }
 function validateEdit() { if (editedText.value.trim()) run(async (id) => { await agentSessionApi.validate(id, task.value.id, editedText.value); editMode.value = false }) }
@@ -555,7 +705,7 @@ onBeforeUnmount(() => {
 })
 </script>
 <style scoped>
-.agent-workbench{min-width:0}.agent-toolbar{display:flex;justify-content:flex-end;margin-top:var(--spacing-md)}.summary-link{min-height:2.75rem;padding:0 1rem;color:var(--color-primary);background:var(--surface-content);border:1px solid var(--border-strong);border-radius:999px;cursor:pointer;font:inherit;font-weight:600}.agent-layout{margin-top:var(--spacing-lg)}.agent-stage{min-width:0}.card{background:var(--surface-content);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:var(--spacing-lg);margin-bottom:var(--spacing-md);box-shadow:var(--shadow-sm)}h3{font-size:16px;margin:0 0 10px}.candidate{white-space:pre-wrap;line-height:1.7}.risk{color:#9a6700}.success{background:#f0fff4}.minor{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.agent-workbench{min-width:0}.agent-toolbar{display:flex;justify-content:flex-end;margin-top:var(--spacing-md)}.summary-link{min-height:2.75rem;padding:0 1rem;color:var(--color-primary);background:var(--surface-content);border:1px solid var(--border-strong);border-radius:999px;cursor:pointer;font:inherit;font-weight:600}.agent-layout{margin-top:var(--spacing-lg)}.agent-stage{min-width:0}.card{background:var(--surface-content);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:var(--spacing-lg);margin-bottom:var(--spacing-md);box-shadow:var(--shadow-sm)}h3{font-size:16px;margin:0 0 10px}.candidate{white-space:pre-wrap;line-height:1.7}.risk{color:#9a6700}.success{background:#f0fff4}.minor{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.fact-summary{display:grid;gap:6px;padding:0;margin:0;list-style:none}.fact-summary li{display:flex;gap:8px;justify-content:space-between;align-items:flex-start;line-height:1.6}.fact-summary__status{flex-shrink:0;color:var(--text-secondary);font-size:12px}.fact-review__progress,.muted{color:var(--text-secondary);font-size:13px}.fact-review__source{font-weight:600;white-space:pre-wrap}.fact-fields{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:12px 0}.fact-fields dt{color:var(--text-secondary);font-size:13px}.fact-fields dd{margin:0;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}.fact-correction__field{display:grid;gap:4px;margin-top:10px;font-size:13px;color:var(--text-secondary)}.fact-correction__field textarea,.fact-correction__field input{width:100%;box-sizing:border-box;padding:8px 10px;color:var(--text-primary);background:var(--surface-content);border:1px solid var(--border-strong);border-radius:var(--radius-md);font:inherit;line-height:1.5;resize:vertical}
 
 @media (min-width:56.25rem){.task-navigation,.evidence-context{position:sticky;top:6rem;max-height:calc(100svh - 7rem);overflow:auto}}
 @media (min-width:56.25rem) and (max-width:74.999rem){.evidence-context{grid-column:2}}

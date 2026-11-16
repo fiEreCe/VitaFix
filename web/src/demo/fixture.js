@@ -27,6 +27,7 @@ export const demoFixture = deepFreeze({
       context: '校园产品用户研究',
       contribution: '负责访谈提纲设计与反馈整理',
       confirmation: 'confirmed',
+      confirmationSource: 'user',
     }],
     tasks: [{
       id: 'demo-task-1',

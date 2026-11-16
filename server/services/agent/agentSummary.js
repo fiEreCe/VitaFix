@@ -199,11 +199,18 @@ function buildTaskSummary(session, task) {
   const facts = factIds
     .map((id) => factsById.get(id))
     .filter(Boolean)
-    .map((fact) => ({
-      id: fact.id,
-      sourceText: typeof fact.sourceText === 'string' ? fact.sourceText : '',
-      confirmation: fact.confirmation || '',
-    }));
+    .map((fact) => {
+      const confirmation = fact.confirmation || '';
+      // 旧会话没有 confirmationSource：只标记为“历史记录”，不冒充用户已确认。
+      const confirmationSource = fact.confirmationSource
+        || (['confirmed', 'corrected'].includes(confirmation) ? 'legacy' : '');
+      return {
+        id: fact.id,
+        sourceText: typeof fact.sourceText === 'string' ? fact.sourceText : '',
+        confirmation,
+        confirmationSource,
+      };
+    });
 
   const sourceText = facts
     .map((fact) => fact.sourceText)

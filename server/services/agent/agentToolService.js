@@ -37,13 +37,15 @@ class AgentToolService {
   async parseResume(rawText, supplements = []) {
     const parsed = await resumeParser.parse(rawText);
     const entries = [...(parsed.projects || []), ...(parsed.experience || [])];
+    // 自动解析只产生“待确认”事实：用户核对前不得进入候选生成与审核。
     const resumeFacts = entries.map((item, index) => ({
       id: `fact-${index + 1}`, sourceText: item.description || item.name || item.position || '', action: item.description || item.role || '',
-      context: item.name || item.company || '', contribution: item.role || '参与相关工作', method: '', result: '', quantity: '', confirmation: 'confirmed', source: 'resume',
+      context: item.name || item.company || '', contribution: item.role || '参与相关工作', method: '', result: '', quantity: '',
+      confirmation: 'pending_confirmation', confirmationSource: 'auto', source: 'resume',
     })).filter((item) => item.sourceText);
     const facts = resumeFacts.length
       ? resumeFacts
-      : [{ id: 'fact-1', sourceText: rawText.slice(0, 300), action: '', context: '', contribution: '', confirmation: 'confirmed', source: 'resume' }];
+      : [{ id: 'fact-1', sourceText: rawText.slice(0, 300), action: '', context: '', contribution: '', confirmation: 'pending_confirmation', confirmationSource: 'auto', source: 'resume' }];
     const supplementFacts = buildSupplementFacts(supplements, {
       resumeText: rawText,
       resumeFacts: facts,
