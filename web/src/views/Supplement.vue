@@ -168,25 +168,30 @@ async function saveAndAnalyze() {
 
   saving.value = true
   try {
-    // 保存补充信息
-    if (items.value.length > 0) {
-      await supplementApi.upsert(resumeId.value, items.value)
+    const hasSupplements = items.value.length > 0
+    // 必须先保存补充经历：保存失败时不创建会话，避免用户误以为内容已参与分析。
+    if (hasSupplements) {
+      try {
+        await supplementApi.upsert(resumeId.value, items.value)
+      } catch (e) {
+        showToast('补充经历保存失败: ' + e.message)
+        return
+      }
     }
-    // 开始分析
-    await startAnalysis()
-  } catch (e) {
-    showToast('操作失败: ' + e.message)
+    // 有新补充经历时创建新会话，确保快照冻结的是刚保存的内容；
+    // 没有补充内容时才复用同一 JD/Resume 的未完成会话。
+    await startAnalysis({ reuseRecovery: !hasSupplements })
   } finally {
     saving.value = false
   }
 }
 
-async function startAnalysis() {
+async function startAnalysis({ reuseRecovery = true } = {}) {
   if (analysisStarting.value) return
   analysisStarting.value = true
   try {
     // 同一设备、同一 JD/Resume 已有未完成会话时继续使用它，避免重复创建。
-    const recovery = forceFresh.value
+    const recovery = forceFresh.value || !reuseRecovery
       ? null
       : findAgentRecovery({ jdId: jdId.value, resumeId: resumeId.value })
     let sessionId = recovery?.id

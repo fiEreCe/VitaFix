@@ -8,6 +8,7 @@ const {
 const { inspectUserEdit } = require('../../domain/agent/guardrails');
 const { evaluateCandidate } = require('./pf002Evaluator');
 const { validate } = require('./modificationValidator');
+const { normalizeSupplementItems } = require('./supplementEvidence');
 
 const ANALYSIS_STARTABLE_STATES = new Set(['draft', 'parsing_failed', 'matching_failed']);
 const ANALYSIS_ACTIVE_STATES = new Set(['parsing', 'matching']);
@@ -32,11 +33,17 @@ class AgentOrchestrator {
     this.scheduler = options.scheduler || DEFAULT_SCHEDULER;
   }
 
-  async createSession({ userId, jdText, resumeText, jdId = null, resumeId = null }) {
+  async createSession({ userId, jdText, resumeText, supplements = [], jdId = null, resumeId = null }) {
     const session = {
       id: crypto.randomUUID(), userId, jdId, resumeId,
       state: 'draft', currentStep: 'input_confirmation',
-      inputSnapshot: { jdText, resumeText, frozenAt: new Date().toISOString() },
+      inputSnapshot: {
+        jdText,
+        resumeText,
+        // 创建时冻结本次使用的补充经历；之后修改 Supplement 不会改变本会话。
+        supplements: normalizeSupplementItems(supplements),
+        frozenAt: new Date().toISOString(),
+      },
       requirements: [], resumeFacts: [], matches: [], tasks: [], transitions: [],
     };
     return this.repository.create(session);
@@ -68,7 +75,12 @@ class AgentOrchestrator {
       let resume;
       try {
         [jd, resume] = await Promise.all([
-          this.tools.parseJD(session.inputSnapshot.jdText), this.tools.parseResume(session.inputSnapshot.resumeText),
+          this.tools.parseJD(session.inputSnapshot.jdText),
+          this.tools.parseResume(
+            session.inputSnapshot.resumeText,
+            // 旧会话没有补充快照时按空列表处理，保持原有输入与恢复行为。
+            session.inputSnapshot.supplements || [],
+          ),
         ]);
       } catch (error) {
         this._transition(session, null, 'parsing_failed', 'INPUT_PARSE_FAILED');

@@ -5,6 +5,7 @@ const auditService = require('./agentAuditService');
 const skillSynonyms = require('../../data/skill-synonyms.json');
 const { validateToolResult } = require('../../domain/agent/contracts');
 const { evidenceOverlap, normalizeText } = require('../../domain/agent/textEvidence');
+const { buildSupplementFacts } = require('./supplementEvidence');
 const {
   ASSESS_ANSWER_PROMPT,
   MODIFICATION_VALIDATION_PROMPT,
@@ -33,14 +34,22 @@ class AgentToolService {
     const requirements = [...(parsed.requirements || []), ...(parsed.responsibilities || [])].map((sourceText, index) => ({ id: `req-${index + 1}`, sourceText, priority: 100 - index }));
     return { requirements: requirements.length ? requirements : [{ id: 'req-1', sourceText: parsed.position || '岗位要求', priority: 100 }] };
   }
-  async parseResume(rawText) {
+  async parseResume(rawText, supplements = []) {
     const parsed = await resumeParser.parse(rawText);
     const entries = [...(parsed.projects || []), ...(parsed.experience || [])];
-    const facts = entries.map((item, index) => ({
+    const resumeFacts = entries.map((item, index) => ({
       id: `fact-${index + 1}`, sourceText: item.description || item.name || item.position || '', action: item.description || item.role || '',
-      context: item.name || item.company || '', contribution: item.role || '参与相关工作', method: '', result: '', quantity: '', confirmation: 'confirmed',
+      context: item.name || item.company || '', contribution: item.role || '参与相关工作', method: '', result: '', quantity: '', confirmation: 'confirmed', source: 'resume',
     })).filter((item) => item.sourceText);
-    return { facts: facts.length ? facts : [{ id: 'fact-1', sourceText: rawText.slice(0, 300), action: '', context: '', contribution: '', confirmation: 'confirmed' }] };
+    const facts = resumeFacts.length
+      ? resumeFacts
+      : [{ id: 'fact-1', sourceText: rawText.slice(0, 300), action: '', context: '', contribution: '', confirmation: 'confirmed', source: 'resume' }];
+    const supplementFacts = buildSupplementFacts(supplements, {
+      resumeText: rawText,
+      resumeFacts: facts,
+      startIndex: facts.length,
+    });
+    return { facts: [...facts, ...supplementFacts] };
   }
   async matchEvidence({ requirements, facts }) {
     return { matches: requirements.map((requirement) => {

@@ -94,16 +94,55 @@ test('Analysis status lookup filters by id and current owner', async (t) => {
   assert.equal(res.statusCode, 404);
 });
 
-test('agent input loader queries JD and Resume by id plus userId', async (t) => {
-  const oldJdFindOne = JD.findOne;
-  const oldResumeFindOne = Resume.findOne;
+test('agent input loader queries JD, Resume, and Supplement by id plus userId', async (t) => {
+  const originals = { jd: JD.findOne, resume: Resume.findOne, supplement: Supplement.findOne };
   const filters = [];
-  JD.findOne = async (filter) => { filters.push(filter); return { rawText: 'JD' }; };
-  Resume.findOne = async (filter) => { filters.push(filter); return { rawText: 'resume' }; };
-  t.after(() => { JD.findOne = oldJdFindOne; Resume.findOne = oldResumeFindOne; });
+  JD.findOne = async (filter) => { filters.push({ model: 'jd', filter }); return { rawText: 'JD' }; };
+  Resume.findOne = async (filter) => { filters.push({ model: 'resume', filter }); return { rawText: 'resume' }; };
+  Supplement.findOne = async (filter) => {
+    filters.push({ model: 'supplement', filter });
+    return { items: [{ type: '实习', title: '数据分析实习', description: '使用SQL分析用户行为', includedInResume: false }] };
+  };
+  t.after(() => {
+    JD.findOne = originals.jd;
+    Resume.findOne = originals.resume;
+    Supplement.findOne = originals.supplement;
+  });
 
-  assert.deepEqual(await loadOwnedInputs('jd1', 'resume1', 'u1'), { jdText: 'JD', resumeText: 'resume' });
-  assert.deepEqual(filters, [{ _id: 'jd1', userId: 'u1' }, { _id: 'resume1', userId: 'u1' }]);
+  assert.deepEqual(await loadOwnedInputs('jd1', 'resume1', 'u1'), {
+    jdText: 'JD',
+    resumeText: 'resume',
+    supplements: [{
+      type: '实习',
+      title: '数据分析实习',
+      period: '',
+      description: '使用SQL分析用户行为',
+      includedInResume: false,
+    }],
+  });
+  assert.deepEqual(filters, [
+    { model: 'jd', filter: { _id: 'jd1', userId: 'u1' } },
+    { model: 'resume', filter: { _id: 'resume1', userId: 'u1' } },
+    { model: 'supplement', filter: { resumeId: 'resume1', userId: 'u1' } },
+  ]);
+});
+
+test('agent input loader treats a missing supplement as an empty list', async (t) => {
+  const originals = { jd: JD.findOne, resume: Resume.findOne, supplement: Supplement.findOne };
+  JD.findOne = async () => ({ rawText: 'JD' });
+  Resume.findOne = async () => ({ rawText: 'resume' });
+  Supplement.findOne = async () => null;
+  t.after(() => {
+    JD.findOne = originals.jd;
+    Resume.findOne = originals.resume;
+    Supplement.findOne = originals.supplement;
+  });
+
+  assert.deepEqual(await loadOwnedInputs('jd1', 'resume1', 'u1'), {
+    jdText: 'JD',
+    resumeText: 'resume',
+    supplements: [],
+  });
 });
 
 test('agent session create maps missing or foreign inputs to non-retryable 404', async () => {

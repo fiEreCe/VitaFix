@@ -2,14 +2,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { AgentOrchestrator } = require('../services/agent/agentOrchestrator');
 
-function makeAnalysisHarness({ state = 'draft', expiresAt = null } = {}) {
+function makeAnalysisHarness({ state = 'draft', expiresAt = null, supplements } = {}) {
   const now = new Date('2026-01-01T00:00:00.000Z');
   let parseCalls = 0;
+  const parseResumeInputs = [];
+  const matchInputs = [];
   const store = {
     id: 'session-1',
     userId: 'u1',
     state,
-    inputSnapshot: { jdText: 'JD', resumeText: '简历' },
+    inputSnapshot: supplements === undefined
+      ? { jdText: 'JD', resumeText: '简历' }
+      : { jdText: 'JD', resumeText: '简历', supplements: structuredClone(supplements) },
     requirements: [],
     resumeFacts: [],
     matches: [],
@@ -83,12 +87,23 @@ function makeAnalysisHarness({ state = 'draft', expiresAt = null } = {}) {
       parseCalls += 1;
       return { requirements: [{ id: 'req-1', sourceText: '用户研究' }] };
     },
-    async parseResume() {
-      return { facts: [{ id: 'fact-1', sourceText: '参与用户访谈', confirmation: 'confirmed' }] };
+    async parseResume(rawText, frozenSupplements = []) {
+      parseResumeInputs.push({ rawText, supplements: structuredClone(frozenSupplements) });
+      const facts = [{ id: 'fact-1', sourceText: '参与用户访谈', confirmation: 'confirmed', source: 'resume' }];
+      frozenSupplements.forEach((_item, index) => {
+        facts.push({
+          id: `fact-${index + 2}`,
+          sourceText: '补充的用户研究经历',
+          confirmation: 'confirmed',
+          source: 'supplement',
+        });
+      });
+      return { facts };
     },
-    async matchEvidence() {
+    async matchEvidence({ requirements, facts }) {
+      matchInputs.push({ requirements: structuredClone(requirements), facts: structuredClone(facts) });
       return {
-        matches: [{ requirementId: 'req-1', factIds: ['fact-1'], gapType: 'expression', priority: 1 }],
+        matches: [{ requirementId: 'req-1', factIds: facts.map((fact) => fact.id), gapType: 'expression', priority: 1 }],
       };
     },
   };
@@ -100,8 +115,106 @@ function makeAnalysisHarness({ state = 'draft', expiresAt = null } = {}) {
     scheduler: { setInterval: () => 0, clearInterval: () => {} },
   });
 
-  return { app, store, parseCalls: () => parseCalls };
+  return {
+    app,
+    store,
+    parseCalls: () => parseCalls,
+    parseResumeInputs,
+    matchInputs,
+  };
 }
+
+test('createSession freezes supplementary experiences independently of later source changes', async () => {
+  const harness = makeAnalysisHarness();
+  const supplements = [{
+    type: '实习',
+    title: '数据分析实习',
+    period: '2024.06-2024.09',
+    description: '使用SQL分析用户行为',
+    includedInResume: false,
+  }, {
+    type: '其他',
+    title: '   ',
+    description: '',
+  }];
+
+  const created = await harness.app.createSession({
+    userId: 'u1',
+    jdText: 'JD',
+    resumeText: '简历',
+    supplements,
+  });
+
+  assert.equal(created.inputSnapshot.resumeText, '简历');
+  assert.deepEqual(created.inputSnapshot.supplements, [{
+    type: '实习',
+    title: '数据分析实习',
+    period: '2024.06-2024.09',
+    description: '使用SQL分析用户行为',
+    includedInResume: false,
+  }]);
+
+  supplements[0].description = '修改后的内容';
+  const result = await harness.app.startAnalysis(created.id, 'u1');
+  assert.equal(result.state, 'evidence_ready');
+  assert.deepEqual(harness.parseResumeInputs[0].supplements, [{
+    type: '实习',
+    title: '数据分析实习',
+    period: '2024.06-2024.09',
+    description: '使用SQL分析用户行为',
+    includedInResume: false,
+  }]);
+});
+
+test('analysis passes frozen supplements to resume parsing and evidence matching', async () => {
+  const supplements = [{
+    type: '项目',
+    title: '数据分析项目',
+    period: '2024',
+    description: '使用SQL分析用户行为',
+    includedInResume: false,
+  }];
+  const harness = makeAnalysisHarness({ supplements });
+
+  const result = await harness.app.startAnalysis('session-1', 'u1');
+
+  assert.deepEqual(harness.parseResumeInputs[0], { rawText: '简历', supplements });
+  assert.ok(result.resumeFacts.some((fact) => fact.id === 'fact-2' && fact.source === 'supplement'));
+  assert.ok(harness.matchInputs[0].facts.some((fact) => fact.id === 'fact-2'));
+  assert.deepEqual(result.tasks[0].factIds, ['fact-1', 'fact-2']);
+});
+
+test('old sessions without a supplement snapshot analyze with an empty supplement list', async () => {
+  const harness = makeAnalysisHarness();
+
+  const result = await harness.app.startAnalysis('session-1', 'u1');
+
+  assert.equal(result.state, 'evidence_ready');
+  assert.deepEqual(harness.parseResumeInputs[0], { rawText: '简历', supplements: [] });
+});
+
+test('recovery after failure reuses the frozen supplement snapshot', async () => {
+  const frozen = [{
+    type: '实习',
+    title: '旧补充经历',
+    period: '',
+    description: '旧补充内容',
+    includedInResume: false,
+  }];
+  const harness = makeAnalysisHarness({ state: 'parsing_failed', supplements: frozen });
+  frozen[0].description = '后来修改的内容';
+
+  const result = await harness.app.startAnalysis('session-1', 'u1');
+
+  assert.equal(result.state, 'evidence_ready');
+  assert.deepEqual(harness.parseResumeInputs[0].supplements, [{
+    type: '实习',
+    title: '旧补充经历',
+    period: '',
+    description: '旧补充内容',
+    includedInResume: false,
+  }]);
+});
 
 test('does not steal a live analysis lease and keeps waiting on the same session', async () => {
   const harness = makeAnalysisHarness({

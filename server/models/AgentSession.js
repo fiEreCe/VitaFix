@@ -4,6 +4,7 @@ const { SESSION_STATES, TASK_STATES, FACT_CONFIRMATIONS } = require('../domain/a
 const factSchema = new mongoose.Schema({
   id: String, sourceText: String, action: String, context: String, contribution: String,
   method: String, result: String, quantity: String, quantityType: { type: String, enum: ['exact', 'estimated', 'unconfirmed'] }, confirmation: { type: String, enum: FACT_CONFIRMATIONS },
+  source: { type: String, enum: ['resume', 'supplement'] },
 }, { _id: false });
 const taskSchema = new mongoose.Schema({
   id: String, requirementId: String, factIds: [String], gapType: String, priority: Number,

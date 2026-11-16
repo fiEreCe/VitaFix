@@ -1,8 +1,10 @@
 const AgentSession = require('../models/AgentSession');
 const JD = require('../models/JD');
 const Resume = require('../models/Resume');
+const Supplement = require('../models/Supplement');
 const { AgentOrchestrator } = require('../services/agent/agentOrchestrator');
 const tools = require('../services/agent/agentToolService');
+const { normalizeSupplementItems } = require('../services/agent/supplementEvidence');
 const {
   buildSessionListItem,
   buildSessionSummary,
@@ -17,13 +19,19 @@ function positiveInteger(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-async function loadOwnedInputs(jdId, resumeId, userId) {
-  const [jd, resume] = await Promise.all([
+async function loadOwnedInputs(jdId, resumeId, userId, { supplementRepository = Supplement } = {}) {
+  const [jd, resume, supplement] = await Promise.all([
     JD.findOne({ _id: jdId, userId }),
     Resume.findOne({ _id: resumeId, userId }),
+    // 补充经历按当前用户 + 简历归属读取，其他用户的 Supplement 不会进入快照。
+    supplementRepository.findOne({ resumeId, userId }),
   ]);
   if (!jd || !resume) throw new Error('INPUT_NOT_FOUND');
-  return { jdText: jd.rawText, resumeText: resume.rawText };
+  return {
+    jdText: jd.rawText,
+    resumeText: resume.rawText,
+    supplements: normalizeSupplementItems(supplement?.items),
+  };
 }
 
 function createAgentSessionRepository() {
@@ -132,10 +140,15 @@ function createAgentSessionRepository() {
   };
 }
 
-function createAgentSessionController({ orchestrator, loadInputs, repository } = {}) {
+function createAgentSessionController({ orchestrator, loadInputs, repository, supplementRepository } = {}) {
   const store = repository || createAgentSessionRepository();
   const app = orchestrator || new AgentOrchestrator({ repository: store, tools });
-  const getInputs = loadInputs || loadOwnedInputs;
+  const getInputs = loadInputs || ((jdId, resumeId, userId) => loadOwnedInputs(
+    jdId,
+    resumeId,
+    userId,
+    { supplementRepository },
+  ));
   const ensureOwned = async (req) => { if (!await store.get(req.params.id, req.userId)) throw new Error('AGENT_SESSION_NOT_FOUND'); };
   const command = (fn) => async (req, res) => {
     try {

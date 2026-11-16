@@ -13,6 +13,7 @@ const {
   replace,
   back,
   resumeUpload,
+  supplementUpsert,
   agentCreate,
   agentStart,
   routeQuery,
@@ -21,6 +22,7 @@ const {
   replace: vi.fn(),
   back: vi.fn(),
   resumeUpload: vi.fn(),
+  supplementUpsert: vi.fn(),
   agentCreate: vi.fn(),
   agentStart: vi.fn(),
   routeQuery: { jdId: 'jd-1' },
@@ -41,7 +43,7 @@ vi.mock('../../src/api', () => ({
     upload: resumeUpload,
   },
   supplementApi: {
-    upsert: vi.fn(),
+    upsert: supplementUpsert,
   },
   agentSessionApi: {
     create: agentCreate,
@@ -55,6 +57,7 @@ describe('input flow semantics', () => {
     replace.mockReset()
     back.mockReset()
     resumeUpload.mockReset()
+    supplementUpsert.mockReset()
     agentCreate.mockReset()
     agentStart.mockReset()
     localStorage.clear()
@@ -162,6 +165,54 @@ describe('input flow semantics', () => {
 
     expect(source).toMatch(/<button[\s\S]*?:aria-label="`删除经历：\$\{item\.title\}`"[\s\S]*?@click="removeItem\(idx\)"/)
     expect(source).toMatch(/<van-icon\s+name="cross"\s+aria-hidden="true"/)
+  })
+
+  it('does not create a session when saving supplemental experiences fails', async () => {
+    routeQuery.jdId = 'jd-1'
+    routeQuery.resumeId = 'resume-1'
+    supplementUpsert.mockRejectedValueOnce(new Error('network down'))
+
+    const { default: Supplement } = await import('../../src/views/Supplement.vue')
+    const wrapper = mount(Supplement)
+    wrapper.vm.items = [{
+      type: '实习',
+      title: '数据分析实习',
+      period: '2024.06-2024.09',
+      description: '使用SQL分析用户行为',
+    }]
+
+    await wrapper.vm.saveAndAnalyze()
+    await flushPromises()
+
+    expect(supplementUpsert).toHaveBeenCalledWith('resume-1', wrapper.vm.items)
+    expect(agentCreate).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('saves supplemental experiences first and creates a fresh session even with a recovery record', async () => {
+    routeQuery.jdId = 'jd-1'
+    routeQuery.resumeId = 'resume-1'
+    saveAgentRecovery({ id: 'session-old', jdId: 'jd-1', resumeId: 'resume-1' })
+    supplementUpsert.mockResolvedValue({ id: 'supplement-1', items: [] })
+    agentCreate.mockResolvedValue({ id: 'session-new' })
+
+    const { default: Supplement } = await import('../../src/views/Supplement.vue')
+    const wrapper = mount(Supplement)
+    wrapper.vm.items = [{
+      type: '项目',
+      title: '数据分析项目',
+      period: '2024',
+      description: '使用SQL分析用户行为',
+    }]
+
+    await wrapper.vm.saveAndAnalyze()
+    await flushPromises()
+
+    expect(supplementUpsert).toHaveBeenCalledTimes(1)
+    expect(supplementUpsert).toHaveBeenCalledWith('resume-1', wrapper.vm.items)
+    expect(agentCreate).toHaveBeenCalledWith('jd-1', 'resume-1')
+    expect(replace).toHaveBeenCalledWith('/agent/session-new')
+    wrapper.unmount()
   })
 
   it('creates the session once, saves recovery, and enters the workbench immediately', async () => {

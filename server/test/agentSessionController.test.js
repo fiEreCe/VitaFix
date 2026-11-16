@@ -15,6 +15,25 @@ test('create validates ids and returns the new agent session', async () => {
   assert.equal(res.body.id, 'session-1');
 });
 
+test('create forwards loaded supplementary experiences into session creation', async () => {
+  let captured = null;
+  const supplements = [{ type: '项目', title: '数据分析项目', period: '2024', description: '使用SQL分析用户行为', includedInResume: false }];
+  const controller = createAgentSessionController({
+    orchestrator: {
+      createSession: async (value) => {
+        captured = value;
+        return { id: 'session-1', state: 'draft' };
+      },
+    },
+    loadInputs: async () => ({ jdText: 'JD', resumeText: '简历', supplements }),
+  });
+  const res = response();
+  await controller.create({ userId: 'u1', body: { jdId: 'jd1', resumeId: 'resume1' } }, res);
+  assert.equal(res.statusCode, 201);
+  assert.deepEqual(captured.supplements, supplements);
+  assert.equal(captured.resumeText, '简历');
+});
+
 test('list scopes to the current user, paginates, and returns only summary fields', async () => {
   let captured = null;
   const controller = createAgentSessionController({
