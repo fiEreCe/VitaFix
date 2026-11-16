@@ -1,0 +1,14 @@
+{
+  "model": "deepseek-v4-flash",
+  "calls": 1,
+  "maxOutputTokens": 8192,
+  "durationMs": 4743,
+  "status": "warning",
+  "findings": [
+    {
+      "type": "estimated_number"
+    }
+  ],
+  "material": "synthetic",
+  "transportRetries": 0
+}

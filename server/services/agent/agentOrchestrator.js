@@ -216,7 +216,7 @@ class AgentOrchestrator {
     try {
       assessment = await this.tools.assessAnswer({
         requirement: session.requirements.find((item) => item.id === task.requirementId),
-        confirmedFact: mergeFacts(this._confirmedFactsForTask(session, task)),
+        confirmedFact: mergeFacts(this._confirmedFactsForTask(session, task).slice(-1)),
         question: task.currentQuestion || this._fallbackQuestion(),
         answer,
       });
@@ -264,7 +264,7 @@ class AgentOrchestrator {
 
     const confirmedFacts = this._confirmedFactsForTask(session, task);
     const baseFact = confirmedFacts.at(-1);
-    const merged = { ...mergeFacts(confirmedFacts), ...this._nonEmptyPatch(assessment.factPatch) };
+    const merged = { ...mergeFacts(baseFact ? [baseFact] : []), ...this._nonEmptyPatch(assessment.factPatch) };
     const fact = {
       id: this._nextFactId(session),
       sourceText: [baseFact?.sourceText, answer].filter(Boolean).join('\n'),

@@ -80,14 +80,62 @@ class AgentToolService {
     });
     return validateToolResult('evaluateModification', result);
   }
-  async draftRevision({ requirement, facts, sufficiency }) {
-    const fact = facts[0];
-    const text = sufficiency === 'basic'
-      ? `${fact.action || fact.sourceText}，围绕${fact.context || requirement.sourceText}开展相关工作。`
-      : `${fact.action || fact.sourceText}，在${fact.context || '相关场景'}中${fact.method ? `通过${fact.method}` : '推进'}，${fact.result || '形成可验证产出'}。`;
-    return { text, factRefs: facts.map((item) => item.id), requirementRefs: [requirement.id], rationaleSummary: `对应岗位要求：${requirement.sourceText}` };
+  async draftRevision({ requirement, facts = [] }) {
+    // Never merge slots across experiences. Each evidence record keeps its own clause.
+    const eligible = facts.filter(f => ['confirmed', 'corrected'].includes(f.confirmation));
+    const fields = ['context', 'contribution', 'action', 'method', 'result', 'quantity'];
+    const evidence = f => fields.map(k => f[k]).filter(Boolean).join(' ') || f.sourceText || '';
+    const seeds = eligible.filter(f => evidenceOverlap(requirement.sourceText, evidence(f)) >= 0.25
+      || hasSynonymMatch(requirement.sourceText, evidence(f)));
+    const contexts = new Set(seeds.map(f => normalizeText(f.context)).filter(Boolean));
+    const selected = eligible.filter(f => seeds.includes(f)
+      || (f.context && contexts.has(normalizeText(f.context))));
+    const clauses = [];
+    const factRefs = [];
+    for (const fact of selected) {
+      let parts = [...new Set(fields.map(k => String(fact[k] || '').trim()).filter(Boolean))];
+      if (!parts.length && fact.sourceText) parts = [fact.sourceText];
+      let clause = parts.join('；');
+      if (!clause) continue;
+      // Source qualifiers survive even when structured extraction omitted them.
+      for (const qualifier of ['课程项目', '团队', '共同', '参与', '协助', '配合']) {
+        if (String(fact.sourceText || '').includes(qualifier) && !clause.includes(qualifier)) clause = `${qualifier}；${clause}`;
+      }
+      if (fact.quantityType === 'unconfirmed' && /\d/.test(clause)) {
+        throw new Error('INSUFFICIENT_CONFIRMED_QUANTITY');
+      }
+      if (fact.quantityType === 'estimated') clause = clause.replace(/(?<![约\d])(\d+(?:\.\d+)?)/g, '约$1');
+      clauses.push(clause);
+      factRefs.push(fact.id);
+    }
+    if (!clauses.length) throw new Error('INSUFFICIENT_RELEVANT_EVIDENCE');
+    return validateToolResult('draftRevision', {
+      text: clauses.join('。\n') + '。', factRefs, requirementRefs: [requirement.id],
+      rationaleSummary: `对应岗位要求：${requirement.sourceText}`,
+    });
   }
-  async repairRevision({ requirement, facts, sufficiency }) { return this.draftRevision({ requirement, facts, sufficiency }); }
+  async repairRevision({ requirement, facts, candidate, findings = [] }) {
+    const repairable = new Set([
+      'unconfirmed_number', 'number_context_expansion', 'unqualified_estimate',
+      'attribution_expansion', 'responsibility_expansion', 'unsupported_claim',
+      'unsupported_claim_semantics', 'semantic_irrelevance', 'irrelevant',
+      'project_status_expansion', 'credential_fabrication', 'skill_fabrication',
+      'learning_to_experience_expansion', 'missing_fact_reference',
+    ]);
+    const risks = findings.filter(f => f.type !== 'estimated_number');
+    if (!candidate?.text || !risks.length || risks.some(f => !repairable.has(f.type))) {
+      throw new Error('UNSAFE_REPAIR_FINDING');
+    }
+    // Rebuild the affected claims from confirmed evidence rather than patching
+    // arbitrary prose, which can retain an unsupported implication.
+    const repaired = await this.draftRevision({ requirement, facts });
+    if (repaired.text === candidate.text
+      && JSON.stringify(repaired.factRefs) === JSON.stringify(candidate.factRefs)
+      && JSON.stringify(repaired.requirementRefs) === JSON.stringify(candidate.requirementRefs)) {
+      throw new Error('REPAIR_UNCHANGED');
+    }
+    return repaired;
+  }
   async verifyRevision(input) { return auditService.verifyRevision(input); }
 }
 module.exports = new AgentToolService();
