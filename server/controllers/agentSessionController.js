@@ -41,7 +41,7 @@ function createAgentSessionRepository() {
   ];
   const persistedChanges = (value) => Object.fromEntries(persistedFields.map((key) => [key, value[key]]));
   return {
-    create: async (value) => new AgentSession(value).save(),
+    create: async (value) => require('../services/retention').createWithInputs(value, () => new AgentSession(value).save()),
     get: async (id, userId) => AgentSession.findOne({ _id: id, userId }),
     save: async (value, userId) => AgentSession.findOneAndUpdate(
       { _id: value._id || value.id, userId },
@@ -170,6 +170,10 @@ function createAgentSessionController({ orchestrator, loadInputs, repository, su
 
   return {
     async create(req, res) { try { const { jdId, resumeId } = req.body || {}; if (!jdId || !resumeId) throw new Error('INPUT_REQUIRED'); const input = await getInputs(jdId, resumeId, req.userId); const session = await app.createSession({ userId: req.userId, jdId, resumeId, ...input }); res.status(201).json({ id: session.id || session._id.toString(), state: session.state }); } catch (error) { sendError(res, error); } },
+    async remove(req, res) {
+      try { res.json(await require('../services/retention').service().remove('agent', req.params.id, req.userId)); }
+      catch (error) { res.status(503).json({ error: '删除未完成，请重试；服务需要支持事务的 MongoDB。' }); }
+    },
     async list(req, res) {
       try {
         const page = positiveInteger(req.query?.page, 1);

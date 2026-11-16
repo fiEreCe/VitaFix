@@ -74,16 +74,6 @@ exports.updateName = async (req, res) => {
  * 删除分析记录（仅限自己的记录）
  */
 exports.remove = async (req, res) => {
-  try {
-    const analysis = await Analysis.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.userId,
-    });
-    if (!analysis) {
-      return res.status(404).json({ error: '记录不存在或无权操作' });
-    }
-    res.json({ message: '删除成功' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  try { res.json(await require('../services/retention').service().remove('analysis', req.params.id, req.userId)); }
+  catch (error) { res.status(503).json({ error: '删除未完成，请重试；服务需要支持事务的 MongoDB。' }); }
 };

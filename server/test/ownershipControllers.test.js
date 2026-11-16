@@ -160,6 +160,7 @@ test('agent session create maps missing or foreign inputs to non-retryable 404',
 });
 
 test('Analysis create scopes all input lookups and owner-conditionally persists completion', async (t) => {
+  t.mock.method(require('../services/retention'), 'createWithInputs', async (value, save) => save());
   const originals = {
     jd: JD.findOne, resume: Resume.findOne, supplement: Supplement.findOne,
     save: Analysis.prototype.save, update: Analysis.updateOne, analyze: matchAnalyzer.analyze,
@@ -196,6 +197,7 @@ test('Analysis create scopes all input lookups and owner-conditionally persists 
 });
 
 test('Analysis async failure owner-conditionally persists failure state', async (t) => {
+  t.mock.method(require('../services/retention'), 'createWithInputs', async (value, save) => save());
   const originals = {
     jd: JD.findOne, resume: Resume.findOne, supplement: Supplement.findOne,
     save: Analysis.prototype.save, update: Analysis.updateOne, analyze: matchAnalyzer.analyze,
@@ -275,6 +277,7 @@ test('Analysis detail and reevaluation use owner base queries and owner-conditio
 test('history update and delete mutations include the current owner', async (t) => {
   const oldUpdate = Analysis.findOneAndUpdate;
   const oldDelete = Analysis.findOneAndDelete;
+  t.mock.method(require('../services/retention'), 'service', () => ({ remove: async (type, id, userId) => { deleteFilter = { _id: id, userId }; return { deleted: true }; } }));
   let updateFilter;
   let deleteFilter;
   Analysis.findOneAndUpdate = async (filter) => { updateFilter = filter; return { _id: 'a4', name: 'new' }; };

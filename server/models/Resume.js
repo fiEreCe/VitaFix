@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const resumeSchema = new mongoose.Schema({
+  retentionVersion: { type: Number, default: 0 },
   userId: { type: String, index: true },
   rawText: { type: String, required: true },
   parsed: {

@@ -68,8 +68,8 @@ const startServer = async () => {
   });
 
   // 启动时清理过期数据，之后每天清理一次
-  cleanupOldData();
-  setInterval(cleanupOldData, 24 * 60 * 60 * 1000);
+  cleanupOldData().catch(() => {});
+  setInterval(() => cleanupOldData().catch(() => {}), 24 * 60 * 60 * 1000);
 };
 
 startServer();

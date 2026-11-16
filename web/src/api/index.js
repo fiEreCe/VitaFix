@@ -148,6 +148,7 @@ export const analysisApi = {
 }
 
 export const agentSessionApi = {
+  remove(id) { return request(`/agent-sessions/${id}`, { method: 'DELETE' }) },
   list(params = {}) { return request('/agent-sessions', { params }) },
   create(jdId, resumeId) { return request('/agent-sessions', { method: 'POST', data: { jdId, resumeId } }) },
   get(id) { return request(`/agent-sessions/${id}`) },

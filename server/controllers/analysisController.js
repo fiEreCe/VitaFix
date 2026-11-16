@@ -37,7 +37,7 @@ exports.create = async (req, res) => {
       resumeId,
       status: 'processing',
     });
-    await analysis.save();
+    await require('../services/retention').createWithInputs(analysis, () => analysis.save());
 
     // 获取补充信息
     const supplement = await Supplement.findOne({ resumeId, userId: req.userId });

@@ -7,6 +7,7 @@
     @back="router.back()"
   >
 
+    <p class="retention-note">记录自创建起保留 7 天，材料自导入起满 7 天且无记录引用时清理；服务启动及每 24 小时执行清理。删除本次记录及独占材料，共享材料保留。</p>
     <StatusPanel v-if="loading" kind="loading" title="正在加载历史记录" />
 
     <StatusPanel
@@ -64,8 +65,9 @@
           >
             汇总
           </button>
-          <template v-else>
+          <template>
             <button
+              v-if="item.type !== 'agent'"
               class="edit-btn"
               type="button"
               :aria-label="`重命名分析：${item.name}`"
@@ -199,11 +201,11 @@ async function saveName() {
 function confirmDelete(item) {
   showConfirmDialog({
     title: '确认删除',
-    message: `确定要删除"${item.name}"的分析记录吗？`,
+    message: '删除本次记录的结果、快照和内嵌事实及属于你的独占材料；其他记录引用的共享材料继续保留。',
   }).then(async () => {
     try {
-      await historyApi.remove(item.id)
-      list.value = list.value.filter((i) => i.id !== item.id)
+      await (item.type === 'agent' ? agentSessionApi : historyApi).remove(item.id)
+      list.value = list.value.filter((i) => entityKey(i) !== entityKey(item))
       events.historyDeleted()
       showToast('已删除')
     } catch (e) {

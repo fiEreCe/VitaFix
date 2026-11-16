@@ -5,6 +5,7 @@ router.get('/', controller.list);
 router.post('/', controller.create);
 router.get('/:id/summary', controller.summary);
 router.get('/:id', controller.get);
+router.delete('/:id', controller.remove);
 router.post('/:id/start', controller.start);
 router.post('/:id/tasks/:taskId/select', controller.selectTask); router.post('/:id/tasks/:taskId/generate', controller.generate); router.post('/:id/tasks/:taskId/decision', controller.decide);
 router.post('/:id/tasks/:taskId/retry', controller.retry);
